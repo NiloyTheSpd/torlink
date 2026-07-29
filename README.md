@@ -84,13 +84,3 @@ Before opening a PR, skim [CONTRIBUTING.md](CONTRIBUTING.md); it lays out the ba
 ## Privacy
 
 Your files stay on your disk, and nothing routes through a central server; torlink only talks to the torrent network directly. Once a download finishes it keeps seeding by default, sharing it back so the next person can find it just as easily. The network only works because people pass things along, and even a few minutes makes a real difference. If you'd rather not, opt out anytime: open the Seeding tab, press `p` to pause or stop any item, and press it again to pick it back up. Always your call.
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=baairon%2Ftorlink&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=baairon/torlink&type=date&theme=dark&legend=top-left&sealed_token=6RClUrW7A_foMjVMW-jdJ_bLj-wl8jtLiajry7T0uQ2F-UraDTQq4-n_hj9rdxkfW9Iqxekmz3p9eNLNUgZM18i04-fIvEYFHl-lz90OrCT5hhglY_qgSKoYh3IanPSjj8nUgVIMAGg6ZtPucVGVu-aCYcFzE3aertjFE4CPRDrO9dNaJKRxPFTH0clL" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=baairon/torlink&type=date&legend=top-left&sealed_token=6RClUrW7A_foMjVMW-jdJ_bLj-wl8jtLiajry7T0uQ2F-UraDTQq4-n_hj9rdxkfW9Iqxekmz3p9eNLNUgZM18i04-fIvEYFHl-lz90OrCT5hhglY_qgSKoYh3IanPSjj8nUgVIMAGg6ZtPucVGVu-aCYcFzE3aertjFE4CPRDrO9dNaJKRxPFTH0clL" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=baairon/torlink&type=date&legend=top-left&sealed_token=6RClUrW7A_foMjVMW-jdJ_bLj-wl8jtLiajry7T0uQ2F-UraDTQq4-n_hj9rdxkfW9Iqxekmz3p9eNLNUgZM18i04-fIvEYFHl-lz90OrCT5hhglY_qgSKoYh3IanPSjj8nUgVIMAGg6ZtPucVGVu-aCYcFzE3aertjFE4CPRDrO9dNaJKRxPFTH0clL" />
- </picture>
-</a>
