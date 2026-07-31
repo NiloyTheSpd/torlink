@@ -1,4 +1,4 @@
-import type { DownloadFocus, Region, Section, SeedFocus } from "./store";
+import type { DownloadFocus, Region, ResultFocus, Section, SeedFocus } from "./store";
 
 export interface Hint {
   keys: string;
@@ -32,6 +32,7 @@ export const HELP_GROUPS: HelpGroup[] = [
       { keys: "s", label: "Sort results" },
       { keys: "z", label: "Hide dead torrents" },
       { keys: "y", label: "Copy magnet" },
+      { keys: "e", label: "Export as .torrent" },
       { keys: "m", label: "Paste magnet" },
     ],
   },
@@ -69,11 +70,14 @@ const FOLDER: Hint = { keys: "e", label: "Folder" };
 
 const TORRENT: Hint = { keys: "s", label: "Export" };
 
+const EXPORT: Hint = { keys: "e", label: "Export" };
+
 export function footerHints(
   region: Region,
   section: Section,
   downloadFocus?: DownloadFocus | null,
   seedFocus?: SeedFocus | null,
+  resultFocus?: ResultFocus | null,
 ): Hint[] {
   if (region === "sidebar") {
     return [
@@ -116,7 +120,7 @@ export function footerHints(
     // chosen folder) stays bound but lives in the `?` sheet alone.
     { keys: "d", label: "Download" },
     { keys: "y", label: "Copy" },
-    { keys: "s", label: "Sort" },
+    resultFocus === "detail" ? EXPORT : { keys: "s", label: "Sort" },
     { keys: "/", label: "Search" },
     { keys: "f", label: "Filter" },
     SWITCH,
