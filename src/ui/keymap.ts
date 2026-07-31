@@ -28,10 +28,11 @@ export const HELP_GROUPS: HelpGroup[] = [
     hints: [
       { keys: "/", label: "Edit search" },
       { keys: "f", label: "Filter list" },
-      { keys: "d", label: "Download (shift+d picks folder)" },
+      { keys: "d", label: "Download (shift+d: folder)" },
       { keys: "s", label: "Sort results" },
       { keys: "z", label: "Hide dead torrents" },
       { keys: "y", label: "Copy magnet" },
+      { keys: "↵", label: "Open details" },
       { keys: "e", label: "Export as .torrent" },
       { keys: "m", label: "Paste magnet" },
     ],
@@ -51,7 +52,7 @@ export const HELP_GROUPS: HelpGroup[] = [
     title: "Seeding",
     hints: [
       { keys: "p", label: "Pause/resume" },
-      { keys: "c", label: "Remove from list" },
+      { keys: "c", label: "Remove (shift+c: all)" },
       { keys: "e", label: "Open folder" },
     ],
   },
