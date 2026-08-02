@@ -6,14 +6,16 @@ export interface YtDlpResult {
   message: string;
 }
 
-export interface YtDlpInfoResult {
-  ok: true;
-  title: string;
-  thumbnail?: string;
-} | {
-  ok: false;
-  message: string;
-};
+export type YtDlpInfoResult =
+  | {
+      ok: true;
+      title: string;
+      thumbnail?: string;
+    }
+  | {
+      ok: false;
+      message: string;
+    };
 
 export function extractUrl(input: string): string | null {
   const trimmed = input.trim();

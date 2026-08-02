@@ -1,8 +1,6 @@
 export const LOGO_LINES: readonly string[] = [
   "   ╭────────────────╮   ",
-  "   │   ▸  GRAB     │   ",
-  "   │   • torrent   │   ",
-  "   │   • media     │   ",
+  "   │   ▸  GRAB      │   ",
   "   ╰────────────────╯   ",
 ];
 
