@@ -307,45 +307,53 @@ export function App({
   const formatVideoOptions = (info: YtDlpInfoResult) => {
     const audioOption = {
       value: "audio_mp3",
-      label: "Best audio → MP3",
-      detail: "Convert the best audio stream to mp3",
+      label: "mp3",
+      detail: "Download the best audio and convert to mp3",
     };
 
-    const muxed = info.formats
-      .filter((fmt) => fmt.format_id && fmt.vcodec && fmt.vcodec !== "none" && fmt.acodec && fmt.acodec !== "none")
-      .map((fmt) => ({
-        format_id: fmt.format_id,
-        width: fmt.width ?? 0,
-        height: fmt.height ?? 0,
-        tbr: fmt.tbr ?? 0,
-        ext: fmt.ext,
-        format: fmt.format,
-        format_note: fmt.format_note,
-        filesize: fmt.filesize ?? fmt.filesize_approx,
-      }))
-      .filter((fmt, index, list) => list.findIndex((other) => other.format_id === fmt.format_id) === index);
+    const muxedFormats = info.formats.filter(
+      (fmt) => fmt.format_id && fmt.vcodec && fmt.vcodec !== "none" && fmt.acodec && fmt.acodec !== "none",
+    );
 
-    const sorted = muxed.sort((a, b) => {
-      const aRes = a.width * 100000 + a.height * 100 + a.tbr;
-      const bRes = b.width * 100000 + b.height * 100 + b.tbr;
-      return bRes - aRes;
+    const byHeight = [...muxedFormats]
+      .filter((fmt) => fmt.height)
+      .sort((a, b) => (b.height ?? 0) - (a.height ?? 0) || (b.tbr ?? 0) - (a.tbr ?? 0));
+
+    const formatOption = (label: string, fmt: YtDlpFormat) => ({
+      value: fmt.format_id,
+      label,
+      detail: `${fmt.ext}${fmt.height ? ` · ${fmt.height}p` : ""}${fmt.tbr ? ` · ${Math.round(fmt.tbr)}kbps` : ""}`.trim(),
     });
 
-    const videoOptions = sorted.slice(0, 6).map((fmt) => {
-      const resolution = fmt.width && fmt.height ? `${fmt.width}x${fmt.height}` : fmt.format_note ?? fmt.format ?? fmt.ext;
-      const sizeText = toHumanSize(fmt.filesize);
-      return {
-        value: fmt.format_id,
-        label: `${fmt.format_id} · ${fmt.ext} · ${resolution}`,
-        detail: `${fmt.format_note ?? fmt.format ?? ""}${sizeText ? ` · ${sizeText}` : ""}`.trim(),
-      };
-    });
+    const options: { value: string; label: string; detail?: string }[] = [];
 
-    if (videoOptions.length === 0) {
-      return [{ value: "best", label: "Best available video", detail: "Fallback to yt-dlp best format" }, audioOption];
+    const pickBest = (minHeight: number, maxHeight?: number) =>
+      byHeight.find(
+        (fmt) =>
+          (fmt.height ?? 0) >= minHeight &&
+          (maxHeight === undefined || (fmt.height ?? 0) < maxHeight),
+      );
+
+    const buckets = [
+      { label: "4k", min: 2160 },
+      { label: "1080p", min: 1080, max: 2160 },
+      { label: "720p", min: 720, max: 1080 },
+      { label: "360p", min: 360, max: 720 },
+    ];
+
+    for (const bucket of buckets) {
+      const fmt = pickBest(bucket.min, bucket.max);
+      if (fmt) options.push(formatOption(bucket.label, fmt));
     }
 
-    return [audioOption, ...videoOptions];
+    if (options.length === 0) {
+      const best = muxedFormats[0];
+      if (best) options.push({ value: best.format_id, label: "best", detail: `${best.ext} · ${best.height ?? "?"}p` });
+    }
+
+    options.push(audioOption);
+
+    return options;
   };
 
   const prepareVideoDownload = useCallback(
@@ -363,6 +371,7 @@ export function App({
           message: info.message,
         });
         setNotice(`yt-dlp error: ${info.message}`);
+        setDownloadMode(null);
         return;
       }
 
@@ -705,7 +714,7 @@ export function App({
         quitAll();
         return;
       }
-      if (editingFolder || editingTrackers || pendingDownload) return; // the prompt owns input (its own esc + enter)
+      if (editingFolder || editingTrackers || pendingDownload || videoFormatPrompt) return; // the prompt owns input (its own esc + enter)
       if (captureMode === "text") return;
       if (showHelp) {
         setShowHelp(false);
@@ -842,10 +851,24 @@ export function App({
           </Box>
         ) : null}
 
+        {videoFormatPrompt ? (
+          <Box marginTop={1}>
+            <VideoFormatPrompt
+              width={Math.max(24, Math.min(cols - 4, 72))}
+              title="pick a format"
+              subtitle={videoFormatPrompt.title}
+              thumbnail={videoFormatPrompt.thumbnail}
+              options={videoFormatPrompt.options}
+              onSelect={downloadSelectedVideo}
+              onCancel={cancelVideoFormatPrompt}
+            />
+          </Box>
+        ) : null}
+
         <Box
           height={bodyH}
           marginTop={compact ? 0 : 1}
-          display={showHelp || editingFolder || editingTrackers || pendingDownload ? "none" : "flex"}
+          display={showHelp || editingFolder || editingTrackers || pendingDownload || videoFormatPrompt ? "none" : "flex"}
           overflow="hidden"
         >
           {downloadMode !== "media" && <Sidebar />}

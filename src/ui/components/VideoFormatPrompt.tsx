@@ -15,6 +15,7 @@ interface VideoFormatPromptProps {
   width: number;
   title: string;
   subtitle?: string;
+  thumbnail?: string;
   options: VideoFormatOption[];
   onSelect: (option: VideoFormatOption) => void;
   onCancel: () => void;
@@ -24,6 +25,7 @@ export function VideoFormatPrompt({
   width,
   title,
   subtitle,
+  thumbnail,
   options,
   onSelect,
   onCancel,
@@ -45,11 +47,18 @@ export function VideoFormatPrompt({
 
   return (
     <Box flexDirection="column" width={width}>
-      <Panel title={title} width={width} focused height={Math.max(6, options.length + 3)}>
+      <Panel title={title} width={width} focused height={Math.max(7, options.length + (thumbnail ? 5 : 4))}>
         {subtitle ? (
           <Box>
             <Text dimColor wrap="truncate-end">
               {truncate(subtitle, width - 4)}
+            </Text>
+          </Box>
+        ) : null}
+        {thumbnail ? (
+          <Box>
+            <Text dimColor wrap="truncate-end">
+              Thumbnail: {truncate(thumbnail, width - 12)}
             </Text>
           </Box>
         ) : null}
