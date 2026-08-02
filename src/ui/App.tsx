@@ -21,6 +21,7 @@ import { openFolder } from "../util/openFolder";
 import { cleanText, formatBytes, truncate } from "../util/format";
 import {
   downloadVideoUrl,
+  downloadPlaylistUrl,
   extractUrl,
   getVideoInfo,
   type YtDlpFormat,
@@ -124,6 +125,8 @@ export function App({
     title: string;
     thumbnail?: string;
     options: { value: string; label: string; detail?: string }[];
+    isPlaylist?: boolean;
+    playlistCount?: number;
   } | null>(null);
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
   const [recovered, setRecovered] = useState(false);
@@ -305,6 +308,8 @@ export function App({
   };
 
   const formatVideoOptions = (info: YtDlpInfoResult) => {
+    if (!info.ok) return [];
+    
     const audioOption = {
       value: "audio_mp3",
       label: "mp3",
@@ -376,6 +381,8 @@ export function App({
         title: truncate(cleanText(info.title), 48),
         thumbnail: info.thumbnail,
         options,
+        isPlaylist: info.isPlaylist,
+        playlistCount: info.playlistCount,
       });
     },
     [config],
@@ -384,22 +391,24 @@ export function App({
   const downloadSelectedVideo = useCallback(
     async (option: { value: string; label: string; detail?: string }) => {
       if (!config || !videoFormatPrompt) return;
-      const { url, title, thumbnail } = videoFormatPrompt;
+      const { url, title, thumbnail, isPlaylist, playlistCount } = videoFormatPrompt;
       const dir = config.downloadDir;
       setVideoFormatPrompt(null);
+      const messagePrefix = isPlaylist ? `Downloading ${playlistCount ?? "all"} video(s) from playlist` : "Downloading video";
       setYtDlpStatus({
         id: `yt-dlp:${Date.now()}`,
         name: title,
         url,
         dir,
         state: "running",
-        message: `Downloading video…`,
+        message: `${messagePrefix}…`,
         thumbnail,
       });
 
       const audioMp3 = option.value === "audio_mp3";
       const formatId = audioMp3 || option.value === "best" ? undefined : option.value;
-      const result = await downloadVideoUrl(url, dir, formatId, audioMp3);
+      const downloadFn = isPlaylist ? downloadPlaylistUrl : downloadVideoUrl;
+      const result = await downloadFn(url, dir, formatId, audioMp3);
 
       if (result.ok) {
         setYtDlpStatus({
@@ -408,10 +417,10 @@ export function App({
           url,
           dir,
           state: "done",
-          message: `Downloaded with yt-dlp.`,
+          message: isPlaylist ? `Downloaded playlist with yt-dlp.` : `Downloaded with yt-dlp.`,
           thumbnail,
         });
-        setNotice(`yt-dlp downloaded: ${title}`);
+        setNotice(isPlaylist ? `yt-dlp downloaded playlist: ${title}` : `yt-dlp downloaded: ${title}`);
         return;
       }
 
@@ -854,6 +863,8 @@ export function App({
               subtitle={videoFormatPrompt.title}
               thumbnail={videoFormatPrompt.thumbnail}
               options={videoFormatPrompt.options}
+              isPlaylist={videoFormatPrompt.isPlaylist}
+              playlistCount={videoFormatPrompt.playlistCount}
               onSelect={downloadSelectedVideo}
               onCancel={cancelVideoFormatPrompt}
             />

@@ -17,6 +17,8 @@ interface VideoFormatPromptProps {
   subtitle?: string;
   thumbnail?: string;
   options: VideoFormatOption[];
+  isPlaylist?: boolean;
+  playlistCount?: number;
   onSelect: (option: VideoFormatOption) => void;
   onCancel: () => void;
 }
@@ -27,11 +29,13 @@ export function VideoFormatPrompt({
   subtitle,
   thumbnail,
   options,
+  isPlaylist,
+  playlistCount,
   onSelect,
   onCancel,
 }: VideoFormatPromptProps) {
   const [cursor, setCursor] = useState(0);
-  const clamped = Math.min(Math.max(cursor, 0), options.length - 1);
+  const clamped = Math.min(Math.max(cursor, 0), Math.max(0, options.length - 1));
 
   useInput((input, key) => {
     if (key.upArrow || input === "k") {
@@ -39,7 +43,10 @@ export function VideoFormatPrompt({
     } else if (key.downArrow || input === "j") {
       setCursor((prev) => (prev === options.length - 1 ? 0 : prev + 1));
     } else if (key.return) {
-      onSelect(options[clamped]);
+      const selected = options[clamped];
+      if (selected) {
+        onSelect(selected);
+      }
     } else if (key.escape) {
       onCancel();
     }
@@ -48,6 +55,13 @@ export function VideoFormatPrompt({
   return (
     <Box flexDirection="column" width={width}>
       <Panel title={title} width={width} focused height={Math.max(7, options.length + (thumbnail ? 5 : 4))}>
+        {isPlaylist ? (
+          <Box>
+            <Text dimColor wrap="truncate-end">
+              Playlist: {playlistCount ?? "multiple"} video(s)
+            </Text>
+          </Box>
+        ) : null}
         {subtitle ? (
           <Box>
             <Text dimColor wrap="truncate-end">

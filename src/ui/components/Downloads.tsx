@@ -182,7 +182,7 @@ export function Downloads() {
                     alignItems="center"
                     justifyContent="center"
                     borderStyle="round"
-                    borderColor={COLOR.dim}
+                    borderColor={COLOR.alt}
                     paddingX={1}
                     paddingY={0}
                     marginRight={1}
