@@ -316,40 +316,28 @@ export function App({
       detail: "Download the best audio and convert to mp3",
     };
 
-    const muxedFormats = info.formats.filter(
-      (fmt) => fmt.format_id && fmt.vcodec && fmt.vcodec !== "none" && fmt.acodec && fmt.acodec !== "none",
-    );
-
-    const byHeight = [...muxedFormats]
-      .filter((fmt) => fmt.height)
-      .sort((a, b) => (b.height ?? 0) - (a.height ?? 0) || (b.tbr ?? 0) - (a.tbr ?? 0));
-
-    const formatOption = (label: string, fmt: YtDlpFormat) => ({
-      value: fmt.format_id,
-      label,
-      detail: `${fmt.ext}${fmt.height ? ` · ${fmt.height}p` : ""}${fmt.tbr ? ` · ${Math.round(fmt.tbr)}kbps` : ""}`.trim(),
-    });
-
-    const options: { value: string; label: string; detail?: string }[] = [];
-
-    const pickBest = (minHeight: number, maxHeight?: number) =>
-      byHeight.find(
-        (fmt) =>
-          (fmt.height ?? 0) >= minHeight &&
-          (maxHeight === undefined || (fmt.height ?? 0) < maxHeight),
-      );
-
-    const buckets = [
-      { label: "4k", min: 2160 },
-      { label: "1080p", min: 1080, max: 2160 },
-      { label: "720p", min: 720, max: 1080 },
-      { label: "360p", min: 360, max: 720 },
+    const options: { value: string; label: string; detail?: string }[] = [
+      {
+        value: "bestvideo[height>=2160]+bestaudio/best[height>=2160]",
+        label: "4K",
+        detail: "2160p and above",
+      },
+      {
+        value: "bestvideo[height>=1080][height<2160]+bestaudio/best[height>=1080][height<2160]",
+        label: "1080p",
+        detail: "1080p to 2160p",
+      },
+      {
+        value: "bestvideo[height>=720][height<1080]+bestaudio/best[height>=720][height<1080]",
+        label: "720p",
+        detail: "720p to 1080p",
+      },
+      {
+        value: "bestvideo[height>=360][height<720]+bestaudio/best[height>=360][height<720]",
+        label: "360p",
+        detail: "360p to 720p",
+      },
     ];
-
-    for (const bucket of buckets) {
-      const fmt = pickBest(bucket.min, bucket.max);
-      if (fmt) options.push(formatOption(bucket.label, fmt));
-    }
 
     options.push(audioOption);
 
