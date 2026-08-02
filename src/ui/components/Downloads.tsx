@@ -188,9 +188,9 @@ export function Downloads() {
                     marginRight={1}
                   >
                     <Text color={color} bold>
-                      🎬
+                      🖼️
                     </Text>
-                    <Text dimColor>{item.state === "running" ? "video" : item.state === "done" ? "done" : "error"}</Text>
+                    <Text dimColor>{item.thumbnail ? "thumb" : "no thumb"}</Text>
                   </Box>
                   <Box flexGrow={1} minWidth={0} flexDirection="column">
                     <Text color={color} bold wrap="truncate-end">
@@ -203,6 +203,9 @@ export function Downloads() {
                         ? "download complete"
                         : item.state}
                     </Text>
+                    {item.thumbnail ? (
+                      <Text dimColor>{truncate(item.thumbnail, 56)}</Text>
+                    ) : null}
                   </Box>
                   <Box width={10} flexShrink={0} marginLeft={1} justifyContent="flex-end">
                     <Text color={color}>{icon}</Text>

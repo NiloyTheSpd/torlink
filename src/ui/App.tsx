@@ -19,7 +19,7 @@ import { magnetFromTorrentFile } from "../sources/torrentFile";
 import { readClipboard, writeClipboard } from "../util/clipboard";
 import { openFolder } from "../util/openFolder";
 import { cleanText, formatBytes, truncate } from "../util/format";
-import { downloadVideoUrl, extractUrl } from "../util/yt-dlp";
+import { downloadVideoUrl, extractUrl, getVideoInfo } from "../util/yt-dlp";
 import {
   StoreContext,
   type CaptureMode,
@@ -351,34 +351,48 @@ export function App({
       if (!config) return;
       const dir = config.downloadDir;
       const id = `yt-dlp:${Date.now()}:${Math.random().toString(16).slice(2)}`;
+      let title = truncate(cleanText(url), 48);
+      let thumbnail: string | undefined;
+
+      const info = await getVideoInfo(url);
+      if (info.ok) {
+        title = truncate(cleanText(info.title), 48);
+        thumbnail = info.thumbnail;
+      }
+
       setYtDlpStatus({
         id,
-        name: truncate(cleanText(url), 48),
+        name: title,
         url,
         dir,
         state: "running",
         message: "Downloading video…",
+        thumbnail,
       });
+
       const result = await downloadVideoUrl(url, dir);
       if (result.ok) {
         setYtDlpStatus({
           id: `yt-dlp:${Date.now()}`,
-          name: truncate(cleanText(url), 48),
+          name: title,
           url,
           dir,
           state: "done",
           message: `Downloaded with yt-dlp.`,
+          thumbnail,
         });
-        setNotice(`yt-dlp downloaded: ${truncate(cleanText(url), 48)}`);
+        setNotice(`yt-dlp downloaded: ${title}`);
         return;
       }
+
       setYtDlpStatus({
         id: `yt-dlp:${Date.now()}`,
-        name: truncate(cleanText(url), 48),
+        name: title,
         url,
         dir,
         state: "error",
         message: result.message,
+        thumbnail,
       });
       setNotice(`yt-dlp error: ${result.message}`);
     },

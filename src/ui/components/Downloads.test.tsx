@@ -150,6 +150,7 @@ describe("Downloads queued rows", () => {
               dir: "~/Downloads/grab",
               state: "running",
               message: "Downloading video…",
+              thumbnail: "https://example.com/thumb.jpg",
             },
           ],
         })}
