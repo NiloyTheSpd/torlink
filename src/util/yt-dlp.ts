@@ -27,6 +27,8 @@ export type YtDlpInfoResult =
       title: string;
       thumbnail?: string;
       formats: YtDlpFormat[];
+      isPlaylist?: boolean;
+      playlistCount?: number;
     }
   | {
       ok: false;
@@ -115,12 +117,16 @@ async function runYtDlpJson(cmd: string, args: string[]): Promise<YtDlpInfoResul
           title?: string;
           thumbnail?: string;
           formats?: YtDlpFormat[];
+          _type?: string;
+          playlist_count?: number;
         };
         resolveResult({
           ok: true,
           title: info.title ?? "Untitled video",
           thumbnail: info.thumbnail,
           formats: Array.isArray(info.formats) ? info.formats : [],
+          isPlaylist: info._type === "playlist",
+          playlistCount: info.playlist_count,
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -154,6 +160,35 @@ export async function downloadVideoUrl(
   audioMp3 = false,
 ): Promise<YtDlpResult> {
   const output = resolve(dir, "%(title)s.%(ext)s");
+  const args = ["-o", output, "--no-warnings", "--no-progress"];
+  if (audioMp3) {
+    args.push("-x", "--audio-format", "mp3", "-f", "bestaudio");
+  } else if (formatId) {
+    args.push("-f", formatId);
+  }
+  args.push(url);
+
+  let result = await runYtDlp("yt-dlp", args);
+  if (result.ok) return result;
+
+  if (result.message === "yt-dlp was not found.") {
+    result = await runYtDlp(process.execPath, ["-m", "yt_dlp", ...args]);
+    if (result.ok) {
+      return result;
+    }
+    return { ok: false, message: "yt-dlp is not installed or unavailable." };
+  }
+
+  return result;
+}
+
+export async function downloadPlaylistUrl(
+  url: string,
+  dir: string,
+  formatId?: string,
+  audioMp3 = false,
+): Promise<YtDlpResult> {
+  const output = resolve(dir, "%(playlist_title)s", "%(title)s.%(ext)s");
   const args = ["-o", output, "--no-warnings", "--no-progress"];
   if (audioMp3) {
     args.push("-x", "--audio-format", "mp3", "-f", "bestaudio");
