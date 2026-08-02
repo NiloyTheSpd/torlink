@@ -6,11 +6,27 @@ export interface YtDlpResult {
   message: string;
 }
 
+export interface YtDlpFormat {
+  format_id: string;
+  format?: string;
+  format_note?: string;
+  ext: string;
+  width?: number;
+  height?: number;
+  tbr?: number;
+  abr?: number;
+  filesize?: number;
+  filesize_approx?: number;
+  acodec?: string;
+  vcodec?: string;
+}
+
 export type YtDlpInfoResult =
   | {
       ok: true;
       title: string;
       thumbnail?: string;
+      formats: YtDlpFormat[];
     }
   | {
       ok: false;
@@ -95,8 +111,17 @@ async function runYtDlpJson(cmd: string, args: string[]): Promise<YtDlpInfoResul
       }
 
       try {
-        const info = JSON.parse(stdout) as { title?: string; thumbnail?: string };
-        resolveResult({ ok: true, title: info.title ?? "Untitled video", thumbnail: info.thumbnail });
+        const info = JSON.parse(stdout) as {
+          title?: string;
+          thumbnail?: string;
+          formats?: YtDlpFormat[];
+        };
+        resolveResult({
+          ok: true,
+          title: info.title ?? "Untitled video",
+          thumbnail: info.thumbnail,
+          formats: Array.isArray(info.formats) ? info.formats : [],
+        });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         resolveResult({ ok: false, message: `yt-dlp json parse failed: ${message}` });
@@ -122,9 +147,20 @@ export async function getVideoInfo(url: string): Promise<YtDlpInfoResult> {
   return result;
 }
 
-export async function downloadVideoUrl(url: string, dir: string): Promise<YtDlpResult> {
+export async function downloadVideoUrl(
+  url: string,
+  dir: string,
+  formatId?: string,
+  audioMp3 = false,
+): Promise<YtDlpResult> {
   const output = resolve(dir, "%(title)s.%(ext)s");
-  const args = ["-o", output, "--no-warnings", "--no-progress", url];
+  const args = ["-o", output, "--no-warnings", "--no-progress"];
+  if (audioMp3) {
+    args.push("-x", "--audio-format", "mp3", "-f", "bestaudio");
+  } else if (formatId) {
+    args.push("-f", formatId);
+  }
+  args.push(url);
 
   let result = await runYtDlp("yt-dlp", args);
   if (result.ok) return result;
