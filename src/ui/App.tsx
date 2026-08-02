@@ -346,11 +346,6 @@ export function App({
       if (fmt) options.push(formatOption(bucket.label, fmt));
     }
 
-    if (options.length === 0) {
-      const best = muxedFormats[0];
-      if (best) options.push({ value: best.format_id, label: "best", detail: `${best.ext} · ${best.height ?? "?"}p` });
-    }
-
     options.push(audioOption);
 
     return options;
