@@ -6,6 +6,15 @@ export interface YtDlpResult {
   message: string;
 }
 
+export interface YtDlpInfoResult {
+  ok: true;
+  title: string;
+  thumbnail?: string;
+} | {
+  ok: false;
+  message: string;
+};
+
 export function extractUrl(input: string): string | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
@@ -45,6 +54,70 @@ async function runYtDlp(cmd: string, args: string[]): Promise<YtDlpResult> {
       }
     });
   });
+}
+
+async function runYtDlpJson(cmd: string, args: string[]): Promise<YtDlpInfoResult> {
+  return new Promise((resolveResult) => {
+    let proc;
+    try {
+      proc = spawn(cmd, args, { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      resolveResult({ ok: false, message });
+      return;
+    }
+
+    let stdout = "";
+    let stderr = "";
+    proc.stdout?.on("data", (chunk) => {
+      stdout += chunk.toString("utf8");
+    });
+    proc.stderr?.on("data", (chunk) => {
+      stderr += chunk.toString("utf8");
+    });
+
+    proc.once("error", (error) => {
+      const err = error as NodeJS.ErrnoException;
+      if (err.code === "ENOENT") {
+        resolveResult({ ok: false, message: "yt-dlp was not found." });
+      } else {
+        resolveResult({ ok: false, message: err.message ?? "yt-dlp failed to start." });
+      }
+    });
+
+    proc.once("close", (code) => {
+      if (code !== 0) {
+        const message = stderr.trim() || `yt-dlp exited with code ${code}.`;
+        resolveResult({ ok: false, message });
+        return;
+      }
+
+      try {
+        const info = JSON.parse(stdout) as { title?: string; thumbnail?: string };
+        resolveResult({ ok: true, title: info.title ?? "Untitled video", thumbnail: info.thumbnail });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        resolveResult({ ok: false, message: `yt-dlp json parse failed: ${message}` });
+      }
+    });
+  });
+}
+
+export async function getVideoInfo(url: string): Promise<YtDlpInfoResult> {
+  const args = ["-j", "--no-warnings", url];
+
+  let result = await runYtDlpJson("yt-dlp", args);
+  if (result.ok) return result;
+
+  if (result.message === "yt-dlp was not found.") {
+    result = await runYtDlpJson(process.execPath, ["-m", "yt_dlp", ...args]);
+    if (result.ok) {
+      return result;
+    }
+    return { ok: false, message: "yt-dlp is not installed or unavailable." };
+  }
+
+  return result;
 }
 
 export async function downloadVideoUrl(url: string, dir: string): Promise<YtDlpResult> {

@@ -36,6 +36,7 @@ export interface MediaDownloadStatus {
   dir: string;
   state: "running" | "done" | "error";
   message: string;
+  thumbnail?: string;
 }
 
 export interface Store {
