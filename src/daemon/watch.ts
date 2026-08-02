@@ -1,4 +1,4 @@
-// Headless watch-folder mode: torlnk watches a directory and downloads any
+// Headless watch-folder mode: grab watches a directory and downloads any
 // torrent dropped into it. This is the "blackhole" pattern torrent clients use
 // so other tools (a seedbox web app, a script, curl) can hand off a torrent by
 // writing a file — no keypress, no TUI. Drop a `.torrent` file, or a `.magnet`
@@ -36,7 +36,7 @@ export function firstMeaningfulLine(text: string): string | null {
 
 function log(message: string): void {
   const stamp = new Date().toISOString();
-  console.log(`[torlnk watch] ${stamp} ${message}`);
+  console.log(`[grab watch] ${stamp} ${message}`);
 }
 
 async function moveInto(dir: string, sub: string, name: string): Promise<void> {

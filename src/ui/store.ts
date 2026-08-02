@@ -29,6 +29,15 @@ export type SeedFocus = "seeding" | "paused" | "missing" | "idle";
 
 export type ResultFocus = "list" | "detail";
 
+export interface MediaDownloadStatus {
+  id: string;
+  name: string;
+  url: string;
+  dir: string;
+  state: "running" | "done" | "error";
+  message: string;
+}
+
 export interface Store {
   config: Config;
   setConfig: (c: Config) => void;
@@ -80,6 +89,8 @@ export interface Store {
 
   notice: string | null;
   setNotice: (s: string | null) => void;
+  mediaDownloads: MediaDownloadStatus[];
+  downloadMode: "torrent" | "media" | null;
 
   quitAll: () => void;
 

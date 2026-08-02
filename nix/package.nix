@@ -47,7 +47,7 @@ let
 in
 
 buildNpmPackage (finalAttrs: {
-  pname = "torlink";
+  pname = "grab";
   version = "1.4.1";
   src = fetchFromGitHub {
     owner = "baairon";
@@ -72,7 +72,7 @@ buildNpmPackage (finalAttrs: {
 
   # build node-datachannel, and wrap clipboard
   postInstall = ''
-    pushd $out/lib/node_modules/torlnk/node_modules/node-datachannel
+    pushd $out/lib/node_modules/grab/node_modules/node-datachannel
 
     # link shared nixpkgs openssl
     substituteInPlace CMakeLists.txt \
@@ -98,7 +98,7 @@ buildNpmPackage (finalAttrs: {
     popd
 
     # wrap clipboard
-    wrapProgram $out/bin/torlnk \
+    wrapProgram $out/bin/grab \
       --prefix PATH : ${
         lib.makeBinPath [
           wl-clipboard
@@ -113,7 +113,7 @@ buildNpmPackage (finalAttrs: {
     changelog = "https://github.com/baairon/torlink/releases/tag/${finalAttrs.src.tag}";
     license = lib.licenses.mit;
     maintainers = with lib.maintainers; [ ghastrum ];
-    mainProgram = "torlnk";
+    mainProgram = "grab";
     platforms = lib.platforms.linux;
   };
 })

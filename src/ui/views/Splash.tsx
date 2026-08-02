@@ -39,21 +39,25 @@ export function Splash({
       {recovered ? (
         <Text dimColor>{`↻ recovered from a crashed start · downloads paused`}</Text>
       ) : null}
-      {showLogo ? (
-        <Logo />
-      ) : (
+      <Box flexDirection="column">
         <Text bold color={COLOR.accent}>
-          torlink
+           █████  ██████   █████  ██████  
         </Text>
-      )}
-      <Box marginTop={2}>
-        <Text color={COLOR.text}>A curated, terminal-native torrent downloader.</Text>
-      </Box>
-      <Box>
-        <Text dimColor>{CATEGORIES}</Text>
+        <Text bold color={COLOR.accent}>
+          ██     ██      ██ ██   ██ ██   ██ 
+        </Text>
+        <Text bold color={COLOR.accent}>
+          ██     ██████  ███████ ██████  
+        </Text>
+        <Text bold color={COLOR.accent}>
+          ██ ███ ██      ██   ██ ██   ██ 
+        </Text>
+        <Text bold color={COLOR.accent}>
+           █████  ██      ██   ██ ██████  
+        </Text>
       </Box>
 
-      <Box marginTop={1} width={barWidth}>
+      <Box marginTop={2} width={barWidth}>
         <SearchBar
           width={barWidth}
           value=""

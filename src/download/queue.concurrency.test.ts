@@ -23,7 +23,7 @@ const mk = (n: number) => ({
 const statuses = (q: DownloadQueue): Record<string, string> =>
   Object.fromEntries(q.getItems().map((i) => [i.id, i.status]));
 
-describe("DownloadQueue concurrent-download cap (TORLINK_MAX_DOWNLOADS)", () => {
+describe("DownloadQueue concurrent-download cap (GRAB_MAX_DOWNLOADS)", () => {
   it("queues torrents beyond the cap, then promotes the oldest when a slot frees", () => {
     const q = new DownloadQueue({ maxDownloads: 2 });
     q.add(mk(1), "/d");

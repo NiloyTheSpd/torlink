@@ -2,7 +2,7 @@ import os from "node:os";
 import path from "node:path";
 import envPaths from "env-paths";
 
-export const APP_NAME = "torlink";
+export const APP_NAME = "grab";
 
 const base = envPaths(APP_NAME, { suffix: "" });
 

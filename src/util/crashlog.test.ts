@@ -4,11 +4,11 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // Same isolation story as bootguard.test.ts: the log path is derived from
-// TORLINK_STATE_DIR at module init, so each test gets a private dir and fresh
+// GRAB_STATE_DIR at module init, so each test gets a private dir and fresh
 // module instances.
 async function isolated() {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "torlink-crashlog-"));
-  vi.stubEnv("TORLINK_STATE_DIR", dir);
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "grab-crashlog-"));
+  vi.stubEnv("GRAB_STATE_DIR", dir);
   vi.resetModules();
   const crashlog = await import("./crashlog");
   return { dir, crashlog };

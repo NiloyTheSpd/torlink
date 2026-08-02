@@ -14,7 +14,7 @@ if (cmd.kind === "help") {
 }
 
 if (cmd.kind === "version") {
-  console.log(`torlink v${VERSION}`);
+  console.log(`Grab v${VERSION}`);
   process.exit(0);
 }
 
@@ -79,8 +79,8 @@ if (cmd.kind === "update") {
 // Enter the alt-screen and hide the hardware cursor: the TUI draws its own
 // cursor (the search field block, list pointers), so the terminal's should
 // stay hidden. restoreTerminal shows it again on exit.
-process.stdout.write("\x1b[?1049h\x1b[?25l\x1b[22;0t\x1b]0;torlink\x07");
-if (process.platform === "win32") process.title = "torlink";
+process.stdout.write("\x1b[?1049h\x1b[?25l\x1b[22;0t\x1b]0;Grab\x07");
+if (process.platform === "win32") process.title = "Grab";
 
 let restored = false;
 function restoreTerminal(): void {

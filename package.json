@@ -1,10 +1,10 @@
 {
-  "name": "torlnk",
+  "name": "grab",
   "version": "1.6.0",
   "description": "A sleek, zero-setup torrent finder and downloader that lives right in your terminal.",
   "type": "module",
   "bin": {
-    "torlnk": "./dist/cli.cjs"
+    "grab": "./dist/cli.cjs"
   },
   "files": [
     "dist",

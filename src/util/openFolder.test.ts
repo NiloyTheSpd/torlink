@@ -52,8 +52,8 @@ describe("openFolder", () => {
 
       const { openFolder } = await import("./openFolder");
 
-      await expect(openFolder("C:\\Users\\me\\Downloads\\torlink")).resolves.toBe(true);
-      expect(spawn).toHaveBeenCalledWith("explorer", ["C:\\Users\\me\\Downloads\\torlink"]);
+      await expect(openFolder("C:\\Users\\me\\Downloads\\grab")).resolves.toBe(true);
+      expect(spawn).toHaveBeenCalledWith("explorer", ["C:\\Users\\me\\Downloads\\grab"]);
     } finally {
       restore();
     }

@@ -1,12 +1,12 @@
-// Detach / reattach for the TUI, the simple + stable way: run torlink inside a
-// persistent tmux session. `torlnk attach` creates the session (or reattaches to
+// Detach / reattach for the TUI, the simple + stable way: run Grab inside a
+// persistent tmux session. `grab attach` creates the session (or reattaches to
 // it if it's already running), so you can detach with tmux's ctrl-b d, log out,
-// log back in over ssh/mosh, and `torlnk attach` again to pick up right where
+// log back in over ssh/mosh, and `grab attach` again to pick up right where
 // you left off. tmux does the heavy lifting, so this stays tiny.
 
 import { spawnSync } from "node:child_process";
 
-export const SESSION = "torlink";
+export const SESSION = "grab";
 
 function shQuote(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`;
@@ -29,7 +29,7 @@ export function tuiCommand(execPath: string, scriptPath: string): string {
 export function runAttach(): never {
   if (!hasTmux()) {
     console.error(
-      "torlink attach needs tmux (for detach/reattach). Install tmux, or just run `torlnk`.",
+      "grab attach needs tmux (for detach/reattach). Install tmux, or just run `grab`.",
     );
     process.exit(1);
   }

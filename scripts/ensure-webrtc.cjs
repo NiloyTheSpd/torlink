@@ -4,7 +4,7 @@ const { execSync } = require('node:child_process');
 const { existsSync } = require('node:fs');
 const { resolve } = require('node:path');
 
-// During postinstall the CWD is always torlink's root directory.
+// During postinstall the CWD is always Grab's root directory.
 // Check whether the native module actually loads; if prebuild-install
 // succeeded on its own (Node 18/20) there is nothing to do. require()
 // resolves through any node_modules layout, so this check is layout-proof.
@@ -28,7 +28,7 @@ if (!moduleDir) {
   process.exit(0); // nothing installed, nothing to build
 }
 
-console.error('\ntorlnk: building WebRTC native module from source.\n');
+console.error('\nGrab: building WebRTC native module from source.\n');
 
 try {
   execSync('npx --yes cmake-js build', {
@@ -38,18 +38,18 @@ try {
     timeout: 300000,
   });
 } catch {
-  // Warn but never fail the install: torlink works without WebRTC peers
+  // Warn but never fail the install: Grab works without WebRTC peers
   // (TCP/uTP swarms still connect), so a missing toolchain must not brick
   // `npm install`.
   console.error('');
-  console.error('torlnk: could not build the WebRTC native module.');
-  console.error('torlnk still works; WebRTC peers just stay unavailable.');
+  console.error('Grab: could not build the WebRTC native module.');
+  console.error('Grab still works; WebRTC peers just stay unavailable.');
   console.error('To enable them, install the build tools, then reinstall:');
   console.error('  Fedora:  sudo dnf install cmake gcc-c++ openssl-devel libstdc++-static');
   console.error('  Debian / Ubuntu:  sudo apt install cmake g++ libssl-dev');
   console.error('  macOS:   xcode-select --install');
   console.error('  Windows: install CMake and Visual Studio Build Tools');
   console.error('');
-  console.error('https://github.com/baairon/torlink/issues/60');
+  console.error('https://github.com/baairon/grab/issues/60');
 }
 process.exit(0);

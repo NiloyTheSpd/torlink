@@ -2,7 +2,7 @@ import { fetchResilient, USER_AGENT, type FetchImpl } from "../util/net";
 import { readManifest } from "./manifest";
 
 // Compare two dotted versions numerically. Pre-release / build suffixes (-rc.1,
-// +build) are dropped before comparing; torlink ships plain x.y.z releases, and
+// +build) are dropped before comparing; Grab ships plain x.y.z releases, and
 // a half-parsed suffix is worse than ignoring it. Returns <0, 0, >0 like a
 // sort comparator (a older, equal, a newer).
 export function compareVersions(a: string, b: string): number {
@@ -30,7 +30,7 @@ export function isNewer(current: string, candidate: string): boolean {
 // Ask the npm registry for the published version of whatever package this code
 // ships in: the name comes from the manifest, never a hardcoded slug, so the
 // comparison always runs against the real npm package. Works no matter how
-// torlink was installed (npm, nix, a git checkout), since they all track the
+// Grab was installed (npm, nix, a git checkout), since they all track the
 // same release. Never throws: the caller is either a background banner or a
 // one-shot command, and neither should care that the network was down.
 export async function fetchLatestVersion(opts: {

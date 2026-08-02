@@ -79,7 +79,7 @@ function makeStore(
 ): Store {
   const noop = (): void => {};
   return {
-    config: { downloadDir: "~/Downloads/torlink" } as Config,
+    config: { downloadDir: "~/Downloads/grab" } as Config,
     setConfig: noop,
     queue: fakeQueue(items, history, seeds),
     view: "browser",
@@ -106,6 +106,8 @@ function makeStore(
     fetchAndExportTorrent: noop,
     notice: null,
     setNotice: noop,
+    mediaDownloads: [],
+    downloadMode: null,
     quitAll: noop,
     listRows: 14,
     compact: false,
@@ -132,7 +134,7 @@ function save(
   }
   writeFileSync(
     join(OUT_DIR, `${name}.svg`),
-    ansiToSvg(frame, { cols: COLS, title: "torlink", ...extra }),
+    ansiToSvg(frame, { cols: COLS, title: "grab", ...extra }),
   );
   console.log(`preview/${name}.svg`);
 }
@@ -145,14 +147,24 @@ save(
   "splash",
   makeStore({ view: "splash", region: "content" }),
   <Box height={18} flexDirection="column" justifyContent="center" alignItems="center" width={COLS}>
-    <Logo />
-    <Box marginTop={2}>
-      <Text color={COLOR.text}>A curated, terminal-native torrent downloader.</Text>
+    <Box flexDirection="column">
+      <Text bold color={COLOR.accent}>
+         █████  ██████   █████  ██████  
+      </Text>
+      <Text bold color={COLOR.accent}>
+        ██     ██      ██ ██   ██ ██   ██ 
+      </Text>
+      <Text bold color={COLOR.accent}>
+        ██     ██████  ███████ ██████  
+      </Text>
+      <Text bold color={COLOR.accent}>
+        ██ ███ ██      ██   ██ ██   ██ 
+      </Text>
+      <Text bold color={COLOR.accent}>
+         █████  ██      ██   ██ ██████  
+      </Text>
     </Box>
-    <Box>
-      <Text dimColor>{CATEGORIES}</Text>
-    </Box>
-    <Box marginTop={1} width={62}>
+    <Box marginTop={2} width={62}>
       <SearchBar width={62} value="" editing placeholder="Search or paste a magnet link…" onSubmit={() => {}} />
     </Box>
     <Box marginTop={1}>

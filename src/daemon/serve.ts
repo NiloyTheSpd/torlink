@@ -1,4 +1,4 @@
-// Headless HTTP add API: torlnk exposes a tiny local server so another program
+// Headless HTTP add API: grab exposes a tiny local server so another program
 // (a seedbox web app, a script, curl) can hand it a torrent over HTTP instead of
 // a keypress. It complements the watch folder — same headless runtime, a
 // different doorway.
@@ -217,7 +217,7 @@ function readBody(req: http.IncomingMessage): Promise<{ text: string; tooLarge: 
 }
 
 function log(message: string): void {
-  console.log(`[torlnk serve] ${new Date().toISOString()} ${message}`);
+  console.log(`[grab serve] ${new Date().toISOString()} ${message}`);
 }
 
 export async function runServe(options: ServeOptions = {}): Promise<void> {
@@ -229,7 +229,7 @@ export async function runServe(options: ServeOptions = {}): Promise<void> {
   if (!LOOPBACK_HOSTS.has(host) && !token) {
     console.error(
       `error: refusing to bind ${host} without a token. Pass --token <secret> ` +
-        `(or set TORLINK_API_TOKEN), or bind 127.0.0.1.`,
+        `(or set GRAB_API_TOKEN or TORLINK_API_TOKEN), or bind 127.0.0.1.`,
     );
     process.exit(1);
     return;
