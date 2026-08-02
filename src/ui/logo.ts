@@ -18,7 +18,7 @@ export const LOGO_LINES: readonly string[] = [
   " ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ",
   "",
   "╔══════════════════════════════════════╗",
-  "║            GRAB ANYTHING  rokan      ║",
+  "║            GRAB ANYTHING  Rokan      ║",
   "╚══════════════════════════════════════╝",
 ];
 
