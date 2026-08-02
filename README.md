@@ -4,7 +4,7 @@
 
 Finding a torrent these days sucks. One site is a minefield of fake download buttons. Another hides the real link under a popup that spawns two more tabs. And after all that, half the results are dead, zero seeders.
 
-Grab is a torrent finder that lives in your terminal, with zero setup and nothing to configure. One search checks a short, curated list of reputable sources at once, and whatever you pick downloads straight to your computer. The files are yours, saved to your downloads folder.
+Grab is a torrent finder that lives in your terminal, with zero setup and nothing to configure. One search checks a short, curated list of reputable sources at once, and whatever you pick downloads straight to your computer. The files are yours, saved to your downloads folder. You can also download videos and playlists directly by pasting URLs.
 
 ## Get started
 
@@ -48,6 +48,18 @@ A short, hand-picked list of trusted sources:
 | Anime | Nyaa, SubsPlease |
 
 Games are the only category that can run code, so they come from FitGirl alone, a repacker with a long, trusted track record; everything else is plain video and subtitles. If a source is down, the search carries on without it, and Grab tells you which one is offline.
+
+## Downloading videos and playlists
+
+Grab can also download videos and entire playlists from any URL. Just paste the link and choose your preferred format:
+
+- **4K** – 2160p and above
+- **1080p** – 1080p to 2160p
+- **720p** – 720p to 1080p
+- **360p** – 360p to 720p
+- **MP3** – Audio only
+
+Playlist downloads automatically organize videos into a folder named after the playlist. All formats download at the highest quality available within your chosen resolution range.
 
 ## Headless
 
