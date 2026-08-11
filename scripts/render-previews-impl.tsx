@@ -106,6 +106,8 @@ function makeStore(
     fetchAndExportTorrent: noop,
     notice: null,
     setNotice: noop,
+    mediaDownloads: [],
+    downloadMode: null,
     quitAll: noop,
     listRows: 14,
     compact: false,
