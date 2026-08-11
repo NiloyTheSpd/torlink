@@ -135,4 +135,33 @@ describe("Downloads queued rows", () => {
     expect(u.frame()).not.toContain("failed");
     expect(lineWith(u, "kubuntu 25.10")).toContain("·");
   });
+
+  it("renders yt-dlp downloads alongside torrent items", async () => {
+    const u = renderUI(
+      <StoreContext.Provider
+        value={makeTestStore({
+          queue: fakeQueue(ACTIVE, RECENT),
+          section: "downloads",
+          mediaDownloads: [
+            {
+              id: "m1",
+              name: "demo clip",
+              url: "https://example.com/video",
+              dir: "~/Downloads/torlink",
+              state: "running",
+              message: "Downloading video…",
+              thumbnail: "https://example.com/thumb.jpg",
+            },
+          ],
+        })}
+      >
+        <Downloads />
+      </StoreContext.Provider>,
+    );
+
+    await vi.waitFor(() => expect(u.frame()).toContain("demo clip"));
+    expect(u.frame()).toContain("video • downloading");
+    expect(u.frame()).toContain("demo clip");
+    expect(u.frame()).toContain("video");
+  });
 });

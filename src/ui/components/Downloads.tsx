@@ -55,6 +55,7 @@ export function Downloads() {
     openDownloadFolder,
     setDownloadFocus,
     exportTorrent,
+    mediaDownloads,
   } = useStore();
   const active = useQueueItems(queue);
   const recent = useQueueHistory(queue);
@@ -115,9 +116,9 @@ export function Downloads() {
     return () => setDownloadFocus(null);
   }, [focusKind, setDownloadFocus]);
 
-  const panelH = Math.max(5, listRows - 1);
+  const panelH = Math.max(5, listRows - 1 + (mediaDownloads.length > 0 ? mediaDownloads.length + 1 : 0));
 
-  if (total === 0) {
+  if (total === 0 && mediaDownloads.length === 0) {
     return (
       <Panel title="downloads" width={contentWidth} focused={focused} height={panelH}>
         <Text dimColor>No downloads yet. Find something and press d to grab it.</Text>
@@ -127,6 +128,7 @@ export function Downloads() {
 
   const hasActive = active.length > 0;
   const hasRecent = recent.length > 0;
+  const hasMedia = mediaDownloads.length > 0;
   const headerRows = hasRecent ? 1 : 0;
   const ceiling = Math.max(1, panelH - 1);
 
@@ -162,6 +164,63 @@ export function Downloads() {
 
   return (
     <Panel title="downloads" width={contentWidth} focused={focused} count={count} height={panelH}>
+      {hasMedia ? (
+        <Box marginBottom={1} flexDirection="column">
+          <Text color={COLOR.accent}>media</Text>
+          {mediaDownloads.map((item) => {
+            const color =
+              item.state === "error" ? COLOR.bad : item.state === "done" ? COLOR.good : COLOR.accent;
+            const icon = item.state === "running" ? ICON.down : item.state === "done" ? ICON.done : ICON.error;
+            const progress = item.state === "running" ? 45 : item.state === "done" ? 100 : 0;
+            return (
+              <Box key={item.id} marginTop={1} flexDirection="column">
+                <Box>
+                  <Box
+                    width={10}
+                    flexShrink={0}
+                    flexDirection="column"
+                    alignItems="center"
+                    justifyContent="center"
+                    borderStyle="round"
+                    borderColor={COLOR.alt}
+                    paddingX={1}
+                    paddingY={0}
+                    marginRight={1}
+                  >
+                    <Text color={color} bold>
+                      🖼️
+                    </Text>
+                    <Text dimColor>{item.thumbnail ? "thumb" : "no thumb"}</Text>
+                  </Box>
+                  <Box flexGrow={1} minWidth={0} flexDirection="column">
+                    <Text color={color} bold wrap="truncate-end">
+                      {cleanText(item.name)}
+                    </Text>
+                    <Text dimColor>
+                      {item.state === "running"
+                        ? "video • downloading"
+                        : item.state === "done"
+                        ? "download complete"
+                        : item.state}
+                    </Text>
+                    {item.thumbnail ? (
+                      <Text dimColor>{truncate(item.thumbnail, 56)}</Text>
+                    ) : null}
+                  </Box>
+                  <Box width={10} flexShrink={0} marginLeft={1} justifyContent="flex-end">
+                    <Text color={color}>{icon}</Text>
+                  </Box>
+                </Box>
+                <Box marginTop={1}>
+                  <Box width={10} flexShrink={0} />
+                  <ProgressBar pct={progress} width={Math.max(12, Math.min(26, contentWidth - 12))} color={color} animate={item.state === "running"} />
+                </Box>
+              </Box>
+            );
+          })}
+        </Box>
+      ) : null}
+
       {activeVisible.map((it, i) => {
         const here = activeStart + i === clamped && focused && inActive;
         const sc = statusColor(it.status);

@@ -20,9 +20,18 @@ import { readClipboard, writeClipboard } from "../util/clipboard";
 import { openFolder } from "../util/openFolder";
 import { cleanText, formatBytes, truncate } from "../util/format";
 import {
+  downloadVideoUrl,
+  downloadPlaylistUrl,
+  extractUrl,
+  getVideoInfo,
+  type YtDlpFormat,
+  type YtDlpInfoResult,
+} from "../util/yt-dlp";
+import {
   StoreContext,
   type CaptureMode,
   type DownloadFocus,
+  type MediaDownloadStatus,
   type Region,
   type ResultFocus,
   type Section,
@@ -31,6 +40,7 @@ import {
   type View,
 } from "./store";
 import { Logo } from "./components/Logo";
+import { VideoFormatPrompt } from "./components/VideoFormatPrompt";
 import { Sidebar, RAIL_WIDTH } from "./components/Sidebar";
 import { Rule } from "./components/Rule";
 import { Footer } from "./components/Footer";
@@ -109,8 +119,18 @@ export function App({
   } | null>(null);
   const [lastDownloadToDir, setLastDownloadToDir] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [ytDlpStatus, setYtDlpStatus] = useState<MediaDownloadStatus | null>(null);
+  const [videoFormatPrompt, setVideoFormatPrompt] = useState<{
+    url: string;
+    title: string;
+    thumbnail?: string;
+    options: { value: string; label: string; detail?: string }[];
+    isPlaylist?: boolean;
+    playlistCount?: number;
+  } | null>(null);
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
   const [recovered, setRecovered] = useState(false);
+  const [downloadMode, setDownloadMode] = useState<"torrent" | "media" | null>(null);
   const booting = useRef(false);
 
   useEffect(() => {
@@ -283,6 +303,129 @@ export function App({
     [config, queue],
   );
 
+  const toHumanSize = (bytes?: number): string | null => {
+    return bytes && bytes > 0 ? formatBytes(bytes) : null;
+  };
+
+  const formatVideoOptions = (info: YtDlpInfoResult) => {
+    if (!info.ok) return [];
+    
+    const audioOption = {
+      value: "audio_mp3",
+      label: "mp3",
+      detail: "Download the best audio and convert to mp3",
+    };
+
+    const options: { value: string; label: string; detail?: string }[] = [
+      {
+        value: "bestvideo[height>=2160]+bestaudio/best[height>=2160]",
+        label: "4K",
+        detail: "2160p and above",
+      },
+      {
+        value: "bestvideo[height>=1080][height<2160]+bestaudio/best[height>=1080][height<2160]",
+        label: "1080p",
+        detail: "1080p to 2160p",
+      },
+      {
+        value: "bestvideo[height>=720][height<1080]+bestaudio/best[height>=720][height<1080]",
+        label: "720p",
+        detail: "720p to 1080p",
+      },
+      {
+        value: "bestvideo[height>=360][height<720]+bestaudio/best[height>=360][height<720]",
+        label: "360p",
+        detail: "360p to 720p",
+      },
+    ];
+
+    options.push(audioOption);
+
+    return options;
+  };
+
+  const prepareVideoDownload = useCallback(
+    async (url: string) => {
+      if (!config) return;
+      setDownloadMode("media");
+      const info = await getVideoInfo(url);
+      if (!info.ok) {
+        setYtDlpStatus({
+          id: `yt-dlp:${Date.now()}`,
+          name: truncate(cleanText(url), 48),
+          url,
+          dir: config.downloadDir,
+          state: "error",
+          message: info.message,
+        });
+        setNotice(`yt-dlp error: ${info.message}`);
+        setDownloadMode(null);
+        return;
+      }
+
+      const options = formatVideoOptions(info);
+      setVideoFormatPrompt({
+        url,
+        title: truncate(cleanText(info.title), 48),
+        thumbnail: info.thumbnail,
+        options,
+        isPlaylist: info.isPlaylist,
+        playlistCount: info.playlistCount,
+      });
+    },
+    [config],
+  );
+
+  const downloadSelectedVideo = useCallback(
+    async (option: { value: string; label: string; detail?: string }) => {
+      if (!config || !videoFormatPrompt) return;
+      const { url, title, thumbnail, isPlaylist, playlistCount } = videoFormatPrompt;
+      const dir = config.downloadDir;
+      setVideoFormatPrompt(null);
+      const messagePrefix = isPlaylist ? `Downloading ${playlistCount ?? "all"} video(s) from playlist` : "Downloading video";
+      setYtDlpStatus({
+        id: `yt-dlp:${Date.now()}`,
+        name: title,
+        url,
+        dir,
+        state: "running",
+        message: `${messagePrefix}…`,
+        thumbnail,
+      });
+
+      const audioMp3 = option.value === "audio_mp3";
+      const formatId = audioMp3 || option.value === "best" ? undefined : option.value;
+      const downloadFn = isPlaylist ? downloadPlaylistUrl : downloadVideoUrl;
+      const result = await downloadFn(url, dir, formatId, audioMp3);
+
+      if (result.ok) {
+        setYtDlpStatus({
+          id: `yt-dlp:${Date.now()}`,
+          name: title,
+          url,
+          dir,
+          state: "done",
+          message: isPlaylist ? `Downloaded playlist with yt-dlp.` : `Downloaded with yt-dlp.`,
+          thumbnail,
+        });
+        setNotice(isPlaylist ? `yt-dlp downloaded playlist: ${title}` : `yt-dlp downloaded: ${title}`);
+        return;
+      }
+
+      setYtDlpStatus({
+        id: `yt-dlp:${Date.now()}`,
+        name: title,
+        url,
+        dir,
+        state: "error",
+        message: result.message,
+        thumbnail,
+      });
+      setNotice(`yt-dlp error: ${result.message}`);
+    },
+    [config, videoFormatPrompt],
+  );
+
   const requestDownloadTo = useCallback(
     (input: {
       id: string;
@@ -342,6 +485,18 @@ export function App({
     })();
   }, []);
 
+  const startVideoDownload = useCallback(
+    async (url: string) => {
+      await prepareVideoDownload(url);
+    },
+    [prepareVideoDownload],
+  );
+
+  const cancelVideoFormatPrompt = useCallback(() => {
+    setVideoFormatPrompt(null);
+    setDownloadMode(null);
+  }, []);
+
   const openDownloadFolder = useCallback((dir: string) => {
     void (async () => {
       const ok = await openFolder(dir);
@@ -390,21 +545,33 @@ export function App({
       if (q) {
         const magnet = parseInput(q);
         if (magnet) {
+          setDownloadMode("torrent");
           startDownload({
             id: magnet.infoHash,
             name: magnet.name,
             magnet: magnet.magnet,
           });
           setView("browser");
+          setSection("downloads");
+          setRegion("content");
+          return;
+        }
+        const url = extractUrl(q);
+        if (url) {
+          void prepareVideoDownload(url);
+          setView("browser");
+          setSection("downloads");
+          setRegion("content");
           return;
         }
       }
+      setDownloadMode(null);
       setQuery(q);
       setView("browser");
       if (section === "downloads") setSection("all");
       setRegion("content");
     },
-    [section, startDownload],
+    [section, startDownload, prepareVideoDownload],
   );
 
   const pasteFromClipboard = useCallback(async () => {
@@ -414,20 +581,38 @@ export function App({
       return;
     }
     const found = text.match(/magnet:\?xt=urn:btih:[^\s"'<>]+/i)?.[0];
-    const magnet = parseInput(found ?? text);
+    const content = found ?? text;
+    const magnet = parseInput(content);
     if (magnet) {
+      setDownloadMode("torrent");
       startDownload({ id: magnet.infoHash, name: magnet.name, magnet: magnet.magnet });
       setView("browser");
+      setSection("downloads");
+      setRegion("content");
+      return;
+    }
+    const url = extractUrl(content);
+    if (url) {
+      void prepareVideoDownload(url);
+      setView("browser");
+      setSection("downloads");
+      setRegion("content");
       return;
     }
     setNotice("No magnet link on the clipboard.");
-  }, [startDownload]);
+  }, [startDownload, prepareVideoDownload]);
 
   useEffect(() => {
     if (!notice) return;
     const t = setTimeout(() => setNotice(null), 4000);
     return () => clearTimeout(t);
   }, [notice]);
+
+  useEffect(() => {
+    if (!ytDlpStatus || ytDlpStatus.state === "running") return;
+    const t = setTimeout(() => setYtDlpStatus(null), 4000);
+    return () => clearTimeout(t);
+  }, [ytDlpStatus]);
 
   const compact = rows < 18;
   const showTopRule = !compact;
@@ -472,6 +657,8 @@ export function App({
       fetchAndExportTorrent,
       notice,
       setNotice,
+      mediaDownloads: ytDlpStatus ? [ytDlpStatus] : [],
+      downloadMode,
       quitAll,
       listRows,
       compact,
@@ -502,6 +689,7 @@ export function App({
     exportTorrent,
     fetchAndExportTorrent,
     notice,
+    ytDlpStatus,
     listRows,
     compact,
     contentWidth,
@@ -509,6 +697,7 @@ export function App({
     rows,
     setConfig,
     quitAll,
+    downloadMode,
   ]);
 
   useInput(
@@ -517,7 +706,7 @@ export function App({
         quitAll();
         return;
       }
-      if (editingFolder || editingTrackers || pendingDownload) return; // the prompt owns input (its own esc + enter)
+      if (editingFolder || editingTrackers || pendingDownload || videoFormatPrompt) return; // the prompt owns input (its own esc + enter)
       if (captureMode === "text") return;
       if (showHelp) {
         setShowHelp(false);
@@ -559,6 +748,7 @@ export function App({
           setRegion("sidebar");
           return;
         }
+        setDownloadMode(null);
         setView("splash");
         return;
       }
@@ -653,13 +843,29 @@ export function App({
           </Box>
         ) : null}
 
+        {videoFormatPrompt ? (
+          <Box marginTop={1}>
+            <VideoFormatPrompt
+              width={Math.max(24, Math.min(cols - 4, 72))}
+              title="pick a format"
+              subtitle={videoFormatPrompt.title}
+              thumbnail={videoFormatPrompt.thumbnail}
+              options={videoFormatPrompt.options}
+              isPlaylist={videoFormatPrompt.isPlaylist}
+              playlistCount={videoFormatPrompt.playlistCount}
+              onSelect={downloadSelectedVideo}
+              onCancel={cancelVideoFormatPrompt}
+            />
+          </Box>
+        ) : null}
+
         <Box
           height={bodyH}
           marginTop={compact ? 0 : 1}
-          display={showHelp || editingFolder || editingTrackers || pendingDownload ? "none" : "flex"}
+          display={showHelp || editingFolder || editingTrackers || pendingDownload || videoFormatPrompt ? "none" : "flex"}
           overflow="hidden"
         >
-          <Sidebar />
+          {downloadMode !== "media" && <Sidebar />}
           <Box flexGrow={1} flexDirection="column">
             {section === "downloads" ? (
               <Downloads />
