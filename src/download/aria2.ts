@@ -1,6 +1,61 @@
 // aria2 direct-URL downloads: binary resolution, JSON-RPC engine, and the URL
 // heuristics that route a typed/pasted link to a direct download.
 
+// --- JSON-RPC transport ------------------------------------------------------
+
+export class Aria2RpcError extends Error {
+  code?: number;
+  constructor(message: string, code?: number) {
+    super(message);
+    this.name = "Aria2RpcError";
+    this.code = code;
+  }
+}
+
+// Minimal JSON-RPC 2.0 client for aria2's HTTP endpoint. Every request carries
+// the secret as params[0] ("token:<secret>"), matching aria2's RPC auth.
+export class Aria2Rpc {
+  private id = 0;
+  constructor(
+    private readonly baseUrl: string,
+    private readonly secret: string,
+  ) {}
+
+  async call<T>(method: string, ...params: unknown[]): Promise<T> {
+    const body = {
+      jsonrpc: "2.0",
+      id: String(++this.id),
+      method: `aria2.${method}`,
+      params: [`token:${this.secret}`, ...params],
+    };
+    let res: Response;
+    try {
+      res = await fetch(this.baseUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      // fetch failed: connection refused / engine not running.
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Aria2RpcError(`aria2 unreachable: ${msg}`);
+    }
+    if (!res.ok) {
+      throw new Aria2RpcError(`aria2 rpc HTTP ${res.status}`);
+    }
+    let parsed: { result?: T; error?: { code?: number; message?: string } };
+    try {
+      parsed = (await res.json()) as { result?: T; error?: { code?: number; message?: string } };
+    } catch {
+      throw new Aria2RpcError("aria2 rpc returned invalid json");
+    }
+    if (parsed.error) {
+      throw new Aria2RpcError(parsed.error.message ?? "aria2 rpc error", parsed.error.code);
+    }
+    return parsed.result as T;
+  }
+}
+
 // Direct-download extensions (pathname, case-insensitive). Anything else is
 // presumed to be a page the user wants yt-dlp to extract from, so video sites
 // never accidentally fall into aria2.
