@@ -62,6 +62,8 @@ torlink can also download videos and entire playlists from any URL. Just paste t
 
 Playlist downloads automatically organize videos into a folder named after the playlist. All formats download at the highest quality available within your chosen resolution range.
 
+yt-dlp ships with torlink: installation fetches the official standalone binary, so video downloads work out of the box. If that download was skipped, torlink falls back to a system `yt-dlp` or the `yt_dlp` python module.
+
 ## Headless
 
 torlink also runs without the TUI, for servers and seedboxes:

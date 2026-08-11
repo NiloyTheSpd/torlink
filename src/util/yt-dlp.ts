@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process";
-import { resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export interface YtDlpResult {
   ok: boolean;
@@ -34,6 +36,53 @@ export type YtDlpInfoResult =
       ok: false;
       message: string;
     };
+
+// The install-time postinstall (scripts/ensure-ytdlp.cjs) drops the official
+// yt-dlp binary here, so `npx torlnk` downloads videos with nothing else to
+// install. The walk reaches the package root from the dev layout
+// (src/util -> ../..) and from the tsup bundle (dist -> ..).
+function packageRoot(): string {
+  let dir =
+    typeof __dirname !== "undefined" ? __dirname : dirname(fileURLToPath(import.meta.url));
+  for (let i = 0; i < 4; i++) {
+    if (existsSync(resolve(dir, "package.json"))) return dir;
+    dir = resolve(dir, "..");
+  }
+  return dir;
+}
+
+const BUNDLED_YTDLP = resolve(
+  packageRoot(),
+  "vendor",
+  "yt-dlp",
+  process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp",
+);
+
+// Resolution order: the bundled binary, then a system yt-dlp, then the
+// python module under either interpreter name. The python candidates fix the
+// original fallback, which spawned process.execPath (node) with -m yt_dlp
+// and could never work.
+function* ytDlpCandidates(): Generator<readonly [string, readonly string[]]> {
+  if (existsSync(BUNDLED_YTDLP)) yield [BUNDLED_YTDLP, []];
+  yield ["yt-dlp", []];
+  yield ["python", ["-m", "yt_dlp"]];
+  yield ["python3", ["-m", "yt_dlp"]];
+}
+
+type Outcome = { ok: boolean; message?: string };
+
+// Runs the operation against each candidate until one succeeds. A candidate
+// that exists but fails (non-ENOENT) stops the cascade, like the original.
+async function runWithFallback<T extends Outcome>(
+  baseArgs: string[],
+  run: (cmd: string, args: string[]) => Promise<T>,
+): Promise<T> {
+  for (const [cmd, prefix] of ytDlpCandidates()) {
+    const result = await run(cmd, [...prefix, ...baseArgs]);
+    if (result.ok || result.message !== "yt-dlp was not found.") return result;
+  }
+  return { ok: false, message: "yt-dlp is not installed or unavailable." } as T;
+}
 
 export function extractUrl(input: string): string | null {
   const trimmed = input.trim();
@@ -137,20 +186,7 @@ async function runYtDlpJson(cmd: string, args: string[]): Promise<YtDlpInfoResul
 }
 
 export async function getVideoInfo(url: string): Promise<YtDlpInfoResult> {
-  const args = ["-j", "--no-warnings", url];
-
-  let result = await runYtDlpJson("yt-dlp", args);
-  if (result.ok) return result;
-
-  if (result.message === "yt-dlp was not found.") {
-    result = await runYtDlpJson(process.execPath, ["-m", "yt_dlp", ...args]);
-    if (result.ok) {
-      return result;
-    }
-    return { ok: false, message: "yt-dlp is not installed or unavailable." };
-  }
-
-  return result;
+  return runWithFallback(["-j", "--no-warnings", url], runYtDlpJson);
 }
 
 export async function downloadVideoUrl(
@@ -168,18 +204,7 @@ export async function downloadVideoUrl(
   }
   args.push(url);
 
-  let result = await runYtDlp("yt-dlp", args);
-  if (result.ok) return result;
-
-  if (result.message === "yt-dlp was not found.") {
-    result = await runYtDlp(process.execPath, ["-m", "yt_dlp", ...args]);
-    if (result.ok) {
-      return result;
-    }
-    return { ok: false, message: "yt-dlp is not installed or unavailable." };
-  }
-
-  return result;
+  return runWithFallback(args, runYtDlp);
 }
 
 export async function downloadPlaylistUrl(
@@ -197,16 +222,5 @@ export async function downloadPlaylistUrl(
   }
   args.push(url);
 
-  let result = await runYtDlp("yt-dlp", args);
-  if (result.ok) return result;
-
-  if (result.message === "yt-dlp was not found.") {
-    result = await runYtDlp(process.execPath, ["-m", "yt_dlp", ...args]);
-    if (result.ok) {
-      return result;
-    }
-    return { ok: false, message: "yt-dlp is not installed or unavailable." };
-  }
-
-  return result;
+  return runWithFallback(args, runYtDlp);
 }
