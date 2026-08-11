@@ -12,6 +12,8 @@ export interface HistoryItem {
   source?: SourceId;
   sizeBytes: number;
   magnet: string;
+  // Set for direct (aria2) downloads; empty magnet goes with it.
+  url?: string;
   dir: string;
   completedAt: number;
 }

@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import { TorrentEngine, message, type AddHandlers } from "./engine";
+import { Aria2Engine, downloadNameFromUrl, type Aria2Status } from "./aria2";
 import {
   saveQueue,
   saveQueueSync,
@@ -45,6 +46,18 @@ const FETCH_METADATA_TIMEOUT_MS = 20_000;
 const POLL_MS = 500;
 const HISTORY_MAX = 500;
 
+// A presentable name for a direct URL: the file basename when the URL names
+// one, else the host, else a truncation of the URL itself.
+function urlItemName(url: string): string {
+  const name = downloadNameFromUrl(url);
+  if (name) return name;
+  try {
+    const host = new URL(url).hostname;
+    if (host) return host;
+  } catch {}
+  return url.length > 60 ? `${url.slice(0, 57)}…` : url;
+}
+
 // Max torrents allowed to actively download at once. Overflow waits as "queued"
 // and starts automatically when a slot frees. 0 / unset = unlimited (default).
 function readMaxDownloads(): number {
@@ -60,6 +73,17 @@ export interface AddInput {
   sizeBytes?: number;
 }
 
+// The slice of Aria2Engine the queue drives. Kept structural so tests can
+// inject a fake without a cast.
+export interface Aria2EngineLike {
+  add(url: string, dir: string): Promise<string>;
+  stats(gid: string): Promise<Aria2Status | null>;
+  pause(gid: string): Promise<void>;
+  unpause(gid: string): Promise<void>;
+  remove(gid: string): Promise<void>;
+  destroy(): Promise<void>;
+}
+
 export interface RestoreOptions {
   // Safe mode: the previous boot died while restoring (see bootguard.ts), so
   // bring every item back paused and start no engines. The list stays intact
@@ -70,7 +94,11 @@ export interface RestoreOptions {
 export class DownloadQueue extends EventEmitter {
   private items = new Map<string, QueueItem>();
   private engine = new TorrentEngine();
+  private aria2: Aria2EngineLike = new Aria2Engine();
+  // Queue item id -> aria2 gid for direct (url) downloads.
+  private gids = new Map<string, string>();
   private poll: ReturnType<typeof setInterval> | null = null;
+  private ticking = false;
   private history: HistoryItem[] = [];
   private seeds = new Map<string, SeedItem>();
   private strayHits = new Map<string, number>();
@@ -80,9 +108,10 @@ export class DownloadQueue extends EventEmitter {
   // Max torrents allowed to download at once; overflow waits as "queued".
   private readonly maxDownloads: number;
 
-  constructor(opts?: { maxDownloads?: number }) {
+  constructor(opts?: { maxDownloads?: number; aria2?: Aria2EngineLike }) {
     super();
     this.maxDownloads = opts?.maxDownloads ?? readMaxDownloads();
+    if (opts?.aria2) this.aria2 = opts.aria2;
   }
 
   // Extra announce URLs appended to every torrent added from now on.
@@ -150,7 +179,7 @@ export class DownloadQueue extends EventEmitter {
     item.status = start ? "downloading" : "queued";
     this.items.set(item.id, item);
     if (start) {
-      this.startEngine(item);
+      this.startItem(item);
       this.ensurePoll();
     }
     this.changed();
@@ -172,6 +201,87 @@ export class DownloadQueue extends EventEmitter {
     }
   }
 
+  // Route an item to its engine: torrents are synchronous, direct (url)
+  // downloads start asynchronously through the aria2 RPC.
+  private startItem(item: QueueItem): void {
+    if (item.url) void this.startUrlEngine(item);
+    else this.startEngine(item);
+  }
+
+  private async startUrlEngine(item: QueueItem): Promise<void> {
+    if (!item.url) return;
+    try {
+      const gid = await this.aria2.add(item.url, item.dir);
+      this.gids.set(item.id, gid);
+    } catch (e) {
+      // Same narrow contract as startEngine's catch: the item fails with a
+      // readable message (aria2 missing, RPC down, bad URL) instead of
+      // taking down the caller (a restore, or the whole app).
+      item.status = "failed";
+      item.error = message(e);
+      item.speed = 0;
+      item.peers = 0;
+      this.changed();
+      void this.persist();
+      this.promote(); // a slot just freed
+      this.maybeStopPoll();
+    }
+  }
+
+  // A presentable name for a direct URL: the file basename when the URL names
+  // one, else the host, else a truncation of the URL itself.
+  /**
+   * Queue a direct http(s)/ftp download through aria2. The id is derived from
+   * the URL (`url:<url>`) so a restart restores and resumes the same item.
+   * Returns whether the item was newly added (false = already in the queue)
+   * and the display name.
+   */
+  async addUrl(url: string, dir: string): Promise<{ added: boolean; name: string }> {
+    const id = `url:${url}`;
+    const existing = this.items.get(id);
+    if (existing && existing.status !== "failed") {
+      return { added: false, name: existing.name };
+    }
+    const name = urlItemName(url);
+    const item: QueueItem = existing
+      ? {
+          ...existing,
+          dir,
+          status: "downloading",
+          error: undefined,
+          speed: 0,
+          ...(existing.dir === dir
+            ? {}
+            : { progress: 0, downloadedBytes: 0, eta: undefined }),
+        }
+      : {
+          id,
+          name,
+          url,
+          magnet: "",
+          dir,
+          status: "downloading",
+          progress: 0,
+          totalBytes: 0,
+          downloadedBytes: 0,
+          speed: 0,
+          peers: 0,
+          addedAt: Date.now(),
+        };
+    // Same concurrent-download cap as torrents: start now if a slot is free,
+    // else hold as "queued" until one frees (see promote()).
+    const start = this.maxDownloads === 0 || this.activeCount < this.maxDownloads;
+    item.status = start ? "downloading" : "queued";
+    this.items.set(item.id, item);
+    if (start) {
+      this.startItem(item);
+      this.ensurePoll();
+    }
+    this.changed();
+    void this.persist();
+    return { added: true, name };
+  }
+
   /**
    * Start queued torrents (oldest first) while download slots are free. Called
    * whenever a slot opens up — a download finishes, fails, is paused, or is
@@ -189,7 +299,7 @@ export class DownloadQueue extends EventEmitter {
       if (!next) break;
       next.status = "downloading";
       next.speed = 0;
-      this.startEngine(next);
+      this.startItem(next);
       started = true;
     }
     if (started) {
@@ -263,6 +373,12 @@ export class DownloadQueue extends EventEmitter {
   private complete(it: QueueItem): void {
     this.recordHistory(it);
     this.items.delete(it.id);
+    if (it.url) {
+      // Drop the finished download from aria2's stopped-list bookkeeping.
+      const gid = this.gids.get(it.id);
+      this.gids.delete(it.id);
+      if (gid) void this.aria2.remove(gid).catch(() => {});
+    }
     // Opt-out seeding: a finished download is already a complete, verified
     // torrent, so keep it alive and seeding instead of tearing it down.
     this.beginSeed(it);
@@ -296,24 +412,61 @@ export class DownloadQueue extends EventEmitter {
     void this.persistSeeds();
   }
 
-  private tick(): void {
-    let any = false;
-    for (const it of this.items.values()) {
-      if (it.status !== "downloading") continue;
-      const s = this.engine.stats(it.id);
-      if (!s) continue;
-      it.progress = Math.min(100, Math.round(s.progress * 100));
-      it.downloadedBytes = s.downloaded;
-      if (s.total) it.totalBytes = s.total;
-      it.speed = s.speed;
-      it.peers = s.peers;
-      it.eta =
-        s.timeRemaining > 0 && Number.isFinite(s.timeRemaining)
-          ? s.timeRemaining / 1000
-          : undefined;
-      if (s.name) it.name = s.name;
-      any = true;
-    }
+  private async tick(): Promise<void> {
+    if (this.ticking) return;
+    this.ticking = true;
+    try {
+      let any = false;
+      for (const it of this.items.values()) {
+        if (it.status !== "downloading") continue;
+        if (it.url) {
+          const gid = this.gids.get(it.id);
+          if (!gid) continue;
+          const st = await this.aria2.stats(gid);
+          if (!st) continue;
+          if (st.status === "complete") {
+            if (st.total) it.downloadedBytes = st.total;
+            this.complete(it);
+            continue;
+          }
+          if (st.status === "error" || st.status === "removed") {
+            it.status = "failed";
+            it.error = st.errorMessage ?? (st.status === "removed" ? "download removed" : "aria2 error");
+            it.speed = 0;
+            it.peers = 0;
+            this.changed();
+            void this.persist();
+            this.promote(); // a slot just freed
+            this.maybeStopPoll();
+            continue;
+          }
+          it.progress = st.progress;
+          it.downloadedBytes = st.downloaded;
+          if (st.total) it.totalBytes = st.total;
+          it.speed = st.speed;
+          it.peers = st.connections;
+          it.eta =
+            st.timeRemaining > 0 && Number.isFinite(st.timeRemaining)
+              ? st.timeRemaining / 1000
+              : undefined;
+          if (st.name) it.name = st.name;
+          any = true;
+          continue;
+        }
+        const s = this.engine.stats(it.id);
+        if (!s) continue;
+        it.progress = Math.min(100, Math.round(s.progress * 100));
+        it.downloadedBytes = s.downloaded;
+        if (s.total) it.totalBytes = s.total;
+        it.speed = s.speed;
+        it.peers = s.peers;
+        it.eta =
+          s.timeRemaining > 0 && Number.isFinite(s.timeRemaining)
+            ? s.timeRemaining / 1000
+            : undefined;
+        if (s.name) it.name = s.name;
+        any = true;
+      }
     const now = Date.now();
     for (const sd of this.seeds.values()) {
       if (sd.status !== "seeding") continue;
@@ -349,11 +502,14 @@ export class DownloadQueue extends EventEmitter {
       any = true;
     }
     if (any) this.changed();
+    } finally {
+      this.ticking = false;
+    }
   }
 
   private ensurePoll(): void {
     if (this.poll) return;
-    this.poll = setInterval(() => this.tick(), POLL_MS);
+    this.poll = setInterval(() => void this.tick(), POLL_MS);
     this.poll.unref();
   }
 
@@ -374,7 +530,16 @@ export class DownloadQueue extends EventEmitter {
     it.speed = 0;
     it.peers = 0;
     it.eta = undefined;
-    if (wasDownloading) this.engine.remove(id);
+    if (wasDownloading) {
+      if (it.url) {
+        // Freeze the aria2 download (it keeps its place in the queue);
+        // resume() unpauses the same gid.
+        const gid = this.gids.get(id);
+        if (gid) void this.aria2.pause(gid).catch(() => {});
+      } else {
+        this.engine.remove(id);
+      }
+    }
     this.changed();
     void this.persist();
     if (wasDownloading) {
@@ -390,8 +555,21 @@ export class DownloadQueue extends EventEmitter {
     const start = this.maxDownloads === 0 || this.activeCount < this.maxDownloads;
     it.status = start ? "downloading" : "queued";
     if (start) {
-      this.startEngine(it);
-      this.ensurePoll();
+      if (it.url) {
+        // Prefer unpausing the live aria2 download; if the engine (or the
+        // gid) is gone, fall back to re-adding the URL — aria2 resumes the
+        // partial file from its .aria2 control file.
+        const gid = this.gids.get(id);
+        if (gid) {
+          void this.aria2.unpause(gid).catch(() => this.startUrlEngine(it));
+        } else {
+          void this.startUrlEngine(it);
+        }
+        this.ensurePoll();
+      } else {
+        this.startItem(it);
+        this.ensurePoll();
+      }
     }
     this.changed();
     void this.persist();
@@ -462,7 +640,14 @@ export class DownloadQueue extends EventEmitter {
 
   cancel(id: string): void {
     if (!this.items.has(id)) return;
-    this.engine.remove(id);
+    const it = this.items.get(id);
+    if (it?.url) {
+      const gid = this.gids.get(id);
+      this.gids.delete(id);
+      if (gid) void this.aria2.remove(gid).catch(() => {});
+    } else {
+      this.engine.remove(id);
+    }
     this.items.delete(id);
     deleteTorrentMeta(id);
     this.changed();
@@ -486,7 +671,13 @@ export class DownloadQueue extends EventEmitter {
     const name = it?.name ?? seed?.name ?? hist?.name;
 
     // Tear down any live engine handle + in-memory record.
-    if (it || seed) this.engine.remove(id);
+    if (it?.url) {
+      const gid = this.gids.get(id);
+      this.gids.delete(id);
+      if (gid) void this.aria2.remove(gid).catch(() => {});
+    } else if (it || seed) {
+      this.engine.remove(id);
+    }
     if (it) this.items.delete(id);
     if (seed) {
       this.seeds.delete(id);
@@ -516,8 +707,15 @@ export class DownloadQueue extends EventEmitter {
     const start = this.maxDownloads === 0 || this.activeCount < this.maxDownloads;
     it.status = start ? "downloading" : "queued";
     if (start) {
-      this.startEngine(it);
-      this.ensurePoll();
+      if (it.url) {
+        // Re-add the URL: aria2 resumes the partial file from its control
+        // file, so a failed-then-retried download picks up where it left off.
+        void this.startUrlEngine(it);
+        this.ensurePoll();
+      } else {
+        this.startItem(it);
+        this.ensurePoll();
+      }
     }
     this.changed();
     void this.persist();
@@ -676,7 +874,7 @@ export class DownloadQueue extends EventEmitter {
       this.items.set(raw.id, raw);
       if (raw.status !== "downloading") continue;
       if (this.maxDownloads === 0 || active < this.maxDownloads) {
-        this.startEngine(raw);
+        this.startItem(raw);
         active++;
       } else {
         // Over the cap on boot → hold as queued (promoted as slots free).
@@ -704,6 +902,7 @@ export class DownloadQueue extends EventEmitter {
       source: it.source,
       sizeBytes: it.totalBytes,
       magnet: it.magnet,
+      url: it.url,
       dir: it.dir,
       completedAt: Date.now(),
     };
@@ -781,5 +980,6 @@ export class DownloadQueue extends EventEmitter {
       this.poll = null;
     }
     this.engine.destroy();
+    void this.aria2.destroy();
   }
 }
