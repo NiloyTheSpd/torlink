@@ -1,0 +1,16 @@
+epic_id: e01
+title: "aria2 direct downloads (AIO downloader)"
+status: planned
+bcps: 8
+stories:
+  - id: e01s01
+    title: "aria2 engine + queue integration for direct URL downloads"
+    bcps: 8
+    tasks: 8
+verify: "bun run test && bun run typecheck"
+context: |
+  torlink is a terminal torrent finder/downloader (webtorrent + ink TUI). The user
+  wants it to be an actual all-in-one downloader: direct http(s)/ftp links must be
+  downloadable too, through aria2, in the same queue and TUI as torrents.
+  aria2 is pinned to release-1.37.0 (latest with win-64bit official builds).
+  No new npm dependencies; bundling mirrors scripts/ensure-ytdlp.cjs.

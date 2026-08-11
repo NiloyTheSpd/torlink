@@ -1,0 +1,44 @@
+core_value: "Make torlink a true all-in-one terminal downloader: torrents (webtorrent), video (yt-dlp), and now direct http(s) links (aria2) — one queue, one TUI."
+
+summary: >
+  torlink currently downloads torrents via webtorrent and video/playlists via yt-dlp,
+  but a plain file URL (an .iso, .zip, .exe, a PDF, a music file) has nowhere to go.
+  This initiative adds aria2 as the third engine: direct http(s)/ftp links are added
+  to the same download queue with live progress, speed, connections, pause/resume,
+  cancel, retry, persistence across restarts (partial resume via aria2 control files),
+  and completion history. aria2c is bundled at install time on Windows (the only
+  platform with official binaries) and resolved from the system elsewhere, mirroring
+  the existing yt-dlp bundling pattern.
+
+in_scope:
+  - "Install-time bundling of aria2c (Windows official build) with system-binary fallback (epic e01)"
+  - "Aria2 engine: RPC-driven lifecycle, add/stats/pause/resume/remove, status mapping (epic e01)"
+  - "Queue integration: direct URLs join the same queue, cap, persistence, restore, history (epic e01)"
+  - "TUI routing: typed/pasted direct URLs (and a `dl ` prefix to force direct) start an aria2 download (epic e01)"
+  - "Downloads view shows aria2 items with progress/speed/connections and a `url` tag (epic e01)"
+  - "Unit + integration tests for engine, queue integration, and URL routing helpers (epic e01)"
+
+out_of_scope:
+  - "aria2 BitTorrent/magnet support — webtorrent already owns torrents incl. seeding; aria2 is direct-URL only"
+  - "FTP/metalink-specific UX — aria2 accepts them via the same add-URL path, no dedicated UI"
+  - "Global speed limits / per-item rate control UI"
+  - "Replacing webtorrent or yt-dlp paths"
+  - "RPC over WebSocket or a persistent daemonized aria2 (the engine spawns on demand)"
+  - "Magnet → aria2 conversion or aria2-based seeding"
+
+constraints:
+  - "No new npm runtime dependencies; bundling follows the existing ensure-ytdlp.cjs postinstall pattern"
+  - "QueueItem/HistoryItem persistence stays backward compatible (old queue files keep loading)"
+  - "Node >= 22, Windows 11 primary target; POSIX must degrade gracefully (system aria2c)"
+  - "aria2 pinned to release-1.37.0 (latest official release with win-64bit assets)"
+
+success_criteria:
+  - "Typing or pasting a direct file URL starts a download shown in the Downloads view with live progress, speed, and connection count"
+  - "Pause/resume/cancel/retry and open-folder work on direct downloads; completion lands in Recent and never tries to seed"
+  - "Quitting mid-download and relaunching resumes the partial file (aria2 control file) without data loss"
+  - "Windows install drops aria2c into vendor/aria2/; machines without it fail the item with a clear message instead of crashing"
+  - "bun run typecheck and bun run test are green; a live end-to-end smoke (local HTTP server → real aria2c → completed file) passes"
+
+references:
+  - "aria2 release assets: https://github.com/aria2/aria2/releases/tag/release-1.37.0"
+  - "Existing pattern: scripts/ensure-ytdlp.cjs + src/util/yt-dlp.ts"
