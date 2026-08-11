@@ -52,6 +52,7 @@ export function Downloads() {
     contentWidth,
     listRows,
     startDownload,
+    startUrlDownload,
     openDownloadFolder,
     setDownloadFocus,
     exportTorrent,
@@ -86,15 +87,17 @@ export function Downloads() {
       } else {
         const h = recent[recentCursor];
         if (!h) return;
-        if (key.return || input === "d")
-          startDownload({
-            id: h.id,
-            name: h.name,
-            magnet: h.magnet,
-            source: h.source,
-            sizeBytes: h.sizeBytes,
-          });
-        else if (input === "c") queue.removeHistory(h.id);
+        if (key.return || input === "d") {
+          if (h.url) startUrlDownload(h.url);
+          else
+            startDownload({
+              id: h.id,
+              name: h.name,
+              magnet: h.magnet,
+              source: h.source,
+              sizeBytes: h.sizeBytes,
+            });
+        } else if (input === "c") queue.removeHistory(h.id);
         // Clear-all lives here, not at the top of the chain, so it can only
         // fire while the cursor is actually on the recent list.
         else if (input === "C") queue.clearHistory();
@@ -255,10 +258,10 @@ export function Downloads() {
               </Box>
               <Box width={4} flexShrink={0} marginLeft={1} justifyContent="flex-end">
                 <Text
-                  color={it.source ? ss.color : undefined}
-                  dimColor={!it.source || !here}
+                  color={it.source ? ss.color : it.url ? COLOR.alt : undefined}
+                  dimColor={(!it.source && !it.url) || !here}
                   bold={here}
-                >{it.source ? ss.tag : "mag"}
+                >{it.source ? ss.tag : it.url ? "url" : "mag"}
                 </Text>
               </Box>
             </Box>
@@ -326,10 +329,10 @@ export function Downloads() {
             </Box>
             <Box width={4} flexShrink={0} marginLeft={1} justifyContent="flex-end">
               <Text
-                color={h.source ? ss.color : undefined}
-                dimColor={!h.source || !here}
+                color={h.source ? ss.color : h.url ? COLOR.alt : undefined}
+                dimColor={(!h.source && !h.url) || !here}
                 bold={here}
-              >{h.source ? ss.tag : "mag"}
+              >{h.source ? ss.tag : h.url ? "url" : "mag"}
               </Text>
             </Box>
           </Box>

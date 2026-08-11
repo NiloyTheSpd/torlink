@@ -160,6 +160,7 @@ export function makeTestStore(overrides: Partial<Store> = {}): Store {
     resultFocus: null,
     setResultFocus: noop,
     startDownload: noop,
+    startUrlDownload: noop,
     requestDownloadTo: noop,
     copyMagnet: noop,
     openDownloadFolder: noop,

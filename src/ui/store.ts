@@ -71,6 +71,9 @@ export interface Store {
     source?: SourceId;
     sizeBytes?: number;
   }) => void;
+  // Queues a direct http(s)/ftp link through the aria2 engine (dedupes by
+  // url-derived id) and reports the outcome through the notice line.
+  startUrlDownload: (url: string) => void;
   // Opens the "download to" prompt (D) so this one download can land in a
   // folder other than the configured default.
   requestDownloadTo: (input: {

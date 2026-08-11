@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StoreContext } from "../store";
-import { fakeQueue, makeTestStore, renderUI, type RenderedUI } from "../testHarness";
+import { fakeQueue, makeTestStore, renderUI, KEY, type RenderedUI } from "../testHarness";
 import { Downloads } from "./Downloads";
 import type { QueueItem } from "../../download/types";
 import type { HistoryItem } from "../../download/history";
@@ -115,6 +115,50 @@ describe("Downloads clear/remove keys", () => {
     u.press("j");
     await vi.waitFor(() => expect(lineWith(u, "debian 12")).toContain("❯"));
     expect(u.frame()).toContain("Recently downloaded  (3)");
+  });
+});
+
+describe("Downloads direct url items", () => {
+  it("renders a 'url' tag instead of the magnet tag for active url items", async () => {
+    const urlItem: QueueItem = {
+      ...activeItem("u1", "distro.iso"),
+      url: "https://example.com/distro.iso",
+      source: undefined,
+      magnet: "",
+    };
+    const u = mount([urlItem], []);
+    await vi.waitFor(() => expect(u.frame()).toContain("distro.iso"));
+    const line = lineWith(u, "distro.iso");
+    expect(line).toContain("url");
+    expect(line).not.toContain("mag");
+  });
+
+  it("re-downloads a url history item through startUrlDownload on enter", async () => {
+    const startUrlDownload = vi.fn();
+    const urlHistory: HistoryItem = {
+      ...recentItem("h4", "tool.bin"),
+      url: "https://example.com/tool.bin",
+      magnet: "",
+    };
+    ui = renderUI(
+      <StoreContext.Provider
+        value={makeTestStore({
+          queue: fakeQueue([], [urlHistory]),
+          section: "downloads",
+          startUrlDownload,
+        })}
+      >
+        <Downloads />
+      </StoreContext.Provider>,
+    );
+    const u = ui;
+    await vi.waitFor(() => expect(u.frame()).toContain("tool.bin"));
+    // The pointer sits on the only recent row already; settle between keys so
+    // the enter press is not coalesced into the same input chunk as "j".
+    await tick();
+    u.press(KEY.enter);
+    await vi.waitFor(() => expect(startUrlDownload).toHaveBeenCalledWith("https://example.com/tool.bin"));
+    expect(startUrlDownload).toHaveBeenCalledTimes(1);
   });
 });
 

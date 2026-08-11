@@ -285,3 +285,43 @@ describe("DownloadQueue url item lifecycle", () => {
     expect(fake.destroy).toHaveBeenCalled();
   });
 });
+
+describe("DownloadQueue url persistence round-trip", () => {
+  it("url items survive save -> load -> restore with the url intact", async () => {
+    // Isolated state dir + fresh module instances (the paths module reads
+    // TORLINK_STATE_DIR at import time) so this never touches the shared
+    // test-state dir or the real user data.
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "torlink-aria2-persist-"));
+    vi.stubEnv("TORLINK_STATE_DIR", dir);
+    vi.resetModules();
+    const { DownloadQueue: IsolatedQueue } = await import("./queue");
+    const { loadQueue } = await import("./persist");
+    try {
+      const first = fakeEngine();
+      const q1 = new IsolatedQueue({ aria2: first });
+      await q1.addUrl(URL, "/tmp/dl");
+      q1.suspend(); // flushes queue.json synchronously, zeroes live stats
+
+      const second = fakeEngine();
+      const q2 = new IsolatedQueue({ aria2: second });
+      q2.restore(await loadQueue());
+      await vi.waitFor(() => {
+        expect(second.add).toHaveBeenCalledWith(URL, "/tmp/dl");
+      });
+      const it = q2.getItems()[0];
+      expect(it).toMatchObject({
+        id: `url:${URL}`,
+        url: URL,
+        magnet: "",
+        status: "downloading",
+        name: "file.bin",
+        dir: "/tmp/dl",
+      });
+      q2.suspend();
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
+  });
+});
