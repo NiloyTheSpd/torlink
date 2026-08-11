@@ -5,6 +5,25 @@ import { loadConfig, saveConfig, type Config } from "../config/config";
 import { normalizeDownloadDir } from "../config/folder";
 import { DownloadQueue } from "../download/queue";
 import { looksLikeDirectDownload } from "../download/aria2";
+
+export type UrlRoute =
+  | { kind: "direct"; url: string }
+  | { kind: "video"; url: string };
+
+/** Decide how a pasted/typed URL is downloaded: direct http(s) via aria2,
+ *  or yt-dlp. "dl <url>" always forces direct; otherwise a URL whose last
+ *  path segment names a file goes direct, everything else (streams,
+ *  playlists, pages) goes through yt-dlp. Returns null when no URL is
+ *  present. */
+export function routeUrlInput(raw: string): UrlRoute | null {
+  const q = raw.trim();
+  const url = extractUrl(q);
+  if (!url) return null;
+  const forced = q.startsWith("dl ") && q.length > 3;
+  return forced || looksLikeDirectDownload(url)
+    ? { kind: "direct", url }
+    : { kind: "video", url };
+}
 import { loadQueue, loadSeeds } from "../download/persist";
 import { loadHistory } from "../download/history";
 import { reconcileQueue } from "../download/reconcile";
@@ -577,14 +596,10 @@ export function App({
           setRegion("content");
           return;
         }
-        const url = extractUrl(q);
-        if (url) {
-          // "dl <url>" forces the direct (aria2) path; otherwise a URL whose
-          // last path segment names a file goes direct and everything else
-          // (streams, playlists, pages) goes through yt-dlp.
-          const direct = q.startsWith("dl ") && q.length > 3;
-          if (direct || looksLikeDirectDownload(url)) startUrlDownload(url);
-          else void prepareVideoDownload(url);
+        const routed = routeUrlInput(q);
+        if (routed) {
+          if (routed.kind === "direct") startUrlDownload(routed.url);
+          else void prepareVideoDownload(routed.url);
           setView("browser");
           setSection("downloads");
           setRegion("content");
@@ -617,11 +632,10 @@ export function App({
       setRegion("content");
       return;
     }
-    const url = extractUrl(content);
-    if (url) {
-      const direct = content.startsWith("dl ") && content.length > 3;
-      if (direct || looksLikeDirectDownload(url)) startUrlDownload(url);
-      else void prepareVideoDownload(url);
+    const routed = routeUrlInput(content);
+    if (routed) {
+      if (routed.kind === "direct") startUrlDownload(routed.url);
+      else void prepareVideoDownload(routed.url);
       setView("browser");
       setSection("downloads");
       setRegion("content");
