@@ -49,12 +49,12 @@ function fakeAria2Server(
 describe("Aria2Rpc", () => {
   it("posts jsonrpc with the token first and returns the result", async () => {
     const fake = await fakeAria2Server(() => ({
-      body: { jsonrpc: "2.0", id: "1", result: { gid: "g1" } },
+      body: { jsonrpc: "2.0", id: "1", result: "g1" },
     }));
     try {
       const rpc = new Aria2Rpc(`http://127.0.0.1:${fake.port}/jsonrpc`, "s3cret");
       const out = await rpc.call("addUri", ["https://x/file.zip"], { dir: "/tmp" });
-      expect(out).toEqual({ gid: "g1" });
+      expect(out).toEqual("g1");
       expect(fake.requests[0]!.method).toBe("aria2.addUri");
       const params = fake.requests[0]!.params;
       expect(params?.[0]).toBe("token:s3cret");
@@ -118,7 +118,7 @@ function fakeProc(): Aria2Process & { kill: ReturnType<typeof vi.fn> } {
 describe("Aria2Engine with an injected rpc (no spawn)", () => {
   it("add() resolves the gid and pins dir/split options plus a derived out name", async () => {
     const fake = await fakeAria2Server(() => ({
-      body: { jsonrpc: "2.0", id: "1", result: { gid: "g1" } },
+      body: { jsonrpc: "2.0", id: "1", result: "g1" },
     }));
     try {
       const engine = new Aria2Engine({

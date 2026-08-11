@@ -313,8 +313,9 @@ export class Aria2Engine {
     };
     const out = downloadNameFromUrl(url);
     if (out) opts.out = out;
-    const result = await this.rpc.call<{ gid: string }>("addUri", [url], opts);
-    return result.gid;
+    // aria2.addUri resolves to the new download's gid as a bare JSON string.
+    const gid = await this.rpc.call<string>("addUri", [url], opts);
+    return gid;
   }
 
   async stats(gid: string): Promise<Aria2Status | null> {

@@ -161,7 +161,13 @@ describe("DownloadQueue url item lifecycle", () => {
       await tick(q);
       expect(q.getItems()).toHaveLength(0);
       const h = q.getHistory()[0];
-      expect(h).toMatchObject({ url: URL, magnet: "", name: "file.bin", dir: "/tmp/dl" });
+      expect(h).toMatchObject({
+        url: URL,
+        magnet: "",
+        name: "file.bin",
+        dir: "/tmp/dl",
+        sizeBytes: 1000,
+      });
       expect(q.getSeeds()).toHaveLength(0);
       expect(q.seedingCount).toBe(0);
       // Completed gid is cleaned out of aria2's stopped list.

@@ -425,7 +425,10 @@ export class DownloadQueue extends EventEmitter {
           const st = await this.aria2.stats(gid);
           if (!st) continue;
           if (st.status === "complete") {
-            if (st.total) it.downloadedBytes = st.total;
+            if (st.total) {
+              it.totalBytes = st.total;
+              it.downloadedBytes = st.total;
+            }
             this.complete(it);
             continue;
           }

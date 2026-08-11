@@ -10,6 +10,9 @@
   cmake,
   openssl,
   cacert,
+  # direct (http/ftp) downloads: aria2 is not bundled on Linux, so the Nix
+  # build provides the system binary the engine falls back to.
+  aria2,
 }:
 
 let
@@ -63,7 +66,7 @@ buildNpmPackage (finalAttrs: {
   npmFlags = [ "--ignore-scripts" ]; # ignore-scripts for ip-set broken preinstall
 
   nativeBuildInputs = [ cmake ];
-  buildInputs = [ openssl ];
+  buildInputs = [ openssl aria2 ];
   dontUseCmakeConfigure = true; # override cmake default (no configure script)
 
   postBuild = ''
