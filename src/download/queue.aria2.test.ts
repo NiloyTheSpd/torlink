@@ -96,8 +96,11 @@ describe("DownloadQueue.addUrl", () => {
     try {
       await q.addUrl("https://a.example/one.bin", "/tmp");
       await q.addUrl("https://b.example/two.bin", "/tmp");
-      expect(q.getItems()[0]!.status).toBe("downloading");
-      expect(q.getItems()[1]!.status).toBe("queued");
+      // getItems() sorts newest-first, so the order flips when the two adds
+      // land in different milliseconds — assert per id, not per index.
+      const byId = new Map(q.getItems().map((it) => [it.id, it.status]));
+      expect(byId.get("url:https://a.example/one.bin")).toBe("downloading");
+      expect(byId.get("url:https://b.example/two.bin")).toBe("queued");
       expect(fake.add).toHaveBeenCalledTimes(1);
 
       await tick(q); // first completes → slot frees → second starts
