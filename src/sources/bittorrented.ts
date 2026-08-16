@@ -1,4 +1,5 @@
 import { fetchResilient, HttpError, USER_AGENT } from "../util/net";
+import { toUnixSeconds } from "../util/format";
 import { buildMagnet } from "./magnet";
 import type { SearchOptions, Source, SourceId, TorrentResult } from "./types";
 
@@ -27,12 +28,6 @@ interface BtResult {
 
 interface BtResponse {
   results?: BtResult[];
-}
-
-function toUnixSeconds(iso: string | undefined): number | undefined {
-  if (!iso) return undefined;
-  const ms = Date.parse(iso);
-  return Number.isNaN(ms) ? undefined : Math.floor(ms / 1000);
 }
 
 // Map the API rows to torlink results. Pure and exported so the mapping is tested

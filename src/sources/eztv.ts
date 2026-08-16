@@ -19,6 +19,9 @@ interface EztvResponse {
 }
 
 async function search(query: string, opts: SearchOptions = {}): Promise<TorrentResult[]> {
+  // The EZTV API has no text search — it only lists recent releases — so any
+  // real query has nothing relevant and would drown the other sources' hits in
+  // browse noise. Empty query means browse, which is the only useful mode.
   if (query.trim()) return [];
 
   const res = await fetchResilient(`${API}?limit=100&page=1`, {

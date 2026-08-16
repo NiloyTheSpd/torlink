@@ -1,3 +1,13 @@
+// Parse a source-provided date string (ISO or RFC-822 pubDate) into unix
+// seconds. Returns undefined for missing or unparseable dates — a malformed
+// feed date must never leak NaN into `added`, where a NaN comparator silently
+// corrupts seeders-first and added-date sorting.
+export function toUnixSeconds(value: string | undefined | null): number | undefined {
+  if (!value) return undefined;
+  const ms = Date.parse(value);
+  return Number.isNaN(ms) ? undefined : Math.floor(ms / 1000);
+}
+
 export function formatBytes(bytes?: number): string {
   if (bytes === undefined || !Number.isFinite(bytes) || bytes <= 0) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"];

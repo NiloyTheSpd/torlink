@@ -109,4 +109,32 @@ describe("unescapeEntities", () => {
   it("unescapes the common wordpress entities", () => {
     expect(unescapeEntities("a &amp; b &#8211; c&#8217;s")).toBe("a & b - c's");
   });
+
+  it("decodes any decimal or hex numeric entity", () => {
+    expect(unescapeEntities("&#8216;tis &#x27;quoted&#x27; &#8230;")).toBe("'tis 'quoted' …");
+  });
+
+  it("decodes the named entities feeds actually emit", () => {
+    expect(unescapeEntities("&lt;tag&gt; &quot;q&quot; &apos;a&apos; a&nbsp;b")).toBe(
+      '<tag> "q" \'a\' a b',
+    );
+  });
+
+  it("leaves unknown named entities untouched", () => {
+    expect(unescapeEntities("&copy; 2026 &madeup;")).toBe("&copy; 2026 &madeup;");
+  });
+
+  it("passes through malformed and out-of-range entities", () => {
+    expect(unescapeEntities("&#x; &#; a &#1114112; b")).toBe("&#x; &#; a &#1114112; b");
+  });
+
+  it("decodes in a single pass — its own output is never re-decoded", () => {
+    // The literal text "&#38;" is encoded as &amp;#38; and must not become "&".
+    expect(unescapeEntities("&amp;#38; &amp;amp;")).toBe("&#38; &amp;");
+  });
+
+  it("folds en/em dashes to plain hyphens", () => {
+    expect(unescapeEntities("Repack &#8211; Update &#8212; v2")).toBe("Repack - Update - v2");
+    expect(unescapeEntities("Repack \u2013 Update \u2014 v2")).toBe("Repack - Update - v2");
+  });
 });

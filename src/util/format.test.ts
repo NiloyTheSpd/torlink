@@ -9,6 +9,7 @@ import {
   cleanText,
   stripControl,
   truncate,
+  toUnixSeconds,
 } from "./format";
 
 describe("formatBytes", () => {
@@ -116,5 +117,26 @@ describe("stripControl", () => {
     expect(stripControl(hash)).toBe(hash);
     expect(stripControl("a  b")).toBe("a  b");
     expect(stripControl("")).toBe("");
+  });
+});
+
+describe("toUnixSeconds", () => {
+  it("parses ISO dates into whole unix seconds", () => {
+    expect(toUnixSeconds("2026-08-01T12:30:45Z")).toBe(Date.parse("2026-08-01T12:30:45Z") / 1000);
+    expect(Number.isInteger(toUnixSeconds("2026-08-01T12:30:45.500Z")!)).toBe(true);
+  });
+
+  it("parses RFC-822 pubDates that RSS feeds serve", () => {
+    expect(toUnixSeconds("Tue, 30 Jun 2026 00:00:00 +0000")).toBe(
+      Date.parse("Tue, 30 Jun 2026 00:00:00 +0000") / 1000,
+    );
+  });
+
+  it("returns undefined for missing, empty, or malformed dates — never NaN", () => {
+    expect(toUnixSeconds(undefined)).toBeUndefined();
+    expect(toUnixSeconds(null)).toBeUndefined();
+    expect(toUnixSeconds("")).toBeUndefined();
+    expect(toUnixSeconds("not a date")).toBeUndefined();
+    expect(toUnixSeconds("Tue, 99 Foo 2026 99:99:99 +0000")).toBeUndefined();
   });
 });

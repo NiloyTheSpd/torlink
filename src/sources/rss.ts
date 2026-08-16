@@ -1,14 +1,37 @@
 import { fetchResilient, HttpError, USER_AGENT } from "../util/net";
+import { toUnixSeconds } from "../util/format";
 import type { SearchOptions, SourceId, TorrentResult } from "./types";
 
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+};
+
+// Single-pass decode: every numeric entity (decimal and hex) plus the handful
+// of named ones these feeds actually emit. One pass matters — sequential
+// replaces would re-decode their own output (&amp;#38; must stay &#38;).
+// Unknown or invalid entities pass through untouched; smart punctuation folds
+// to its plain-ASCII look-alike so titles stay terminal-friendly.
 export function unescapeEntities(s: string): string {
   return s
-    .replace(/&#0?38;|&amp;/g, "&")
-    .replace(/&#8211;|&#8212;/g, "-")
-    .replace(/&#8217;|&#0?39;|&apos;/g, "'")
-    .replace(/&#8220;|&#8221;|&quot;/g, '"')
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
+    .replace(/&#(x[0-9a-f]+|\d+);|&([a-z]+);/gi, (m, num: string, name: string) => {
+      if (num) {
+        const code = /^x/i.test(num) ? parseInt(num.slice(1), 16) : parseInt(num, 10);
+        try {
+          return String.fromCodePoint(code);
+        } catch {
+          return m; // out of range for a code point
+        }
+      }
+      return NAMED_ENTITIES[name.toLowerCase()] ?? m;
+    })
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201c\u201d]/g, '"')
+    .replace(/[\u2013\u2014]/g, "-");
 }
 
 function parseRssItems(xml: string, source: SourceId): TorrentResult[] {
@@ -22,8 +45,7 @@ function parseRssItems(xml: string, source: SourceId): TorrentResult[] {
     if (!infoHash) continue;
 
     const name = unescapeEntities(item.match(/<title>(.*?)<\/title>/)?.[1] ?? "Unknown Title");
-    const addedStr = item.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] ?? "";
-    const added = addedStr ? new Date(addedStr).getTime() / 1000 : 0;
+    const added = toUnixSeconds(item.match(/<pubDate>(.*?)<\/pubDate>/)?.[1]) ?? 0;
 
     out.push({ infoHash, name, sizeBytes: 0, seeders: 0, leechers: 0, source, magnet, added });
   }

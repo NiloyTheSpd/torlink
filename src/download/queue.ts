@@ -13,7 +13,7 @@ import {
   deleteTorrentMeta,
   type SeedRecord,
 } from "./persist";
-import { saveHistory, saveHistorySync, type HistoryItem } from "./history";
+import { saveHistory, saveHistorySync, HISTORY_CAP, type HistoryItem } from "./history";
 import { deleteSeedData } from "./delete-data";
 import { disarmBootMarker } from "./bootguard";
 import type { QueueItem, SeedItem } from "./types";
@@ -44,7 +44,6 @@ const SEED_GRACE_MS = 10_000;
 const FETCH_METADATA_TIMEOUT_MS = 20_000;
 
 const POLL_MS = 500;
-const HISTORY_MAX = 500;
 
 // A presentable name for a direct URL: the file basename when the URL names
 // one, else the host, else a truncation of the URL itself.
@@ -891,7 +890,7 @@ export class DownloadQueue extends EventEmitter {
   }
 
   restoreHistory(items: HistoryItem[]): void {
-    this.history = items.slice(0, HISTORY_MAX);
+    this.history = items.slice(0, HISTORY_CAP);
   }
 
   getHistory(): HistoryItem[] {
@@ -909,7 +908,7 @@ export class DownloadQueue extends EventEmitter {
       dir: it.dir,
       completedAt: Date.now(),
     };
-    this.history = [rec, ...this.history.filter((h) => h.id !== it.id)].slice(0, HISTORY_MAX);
+    this.history = [rec, ...this.history.filter((h) => h.id !== it.id)].slice(0, HISTORY_CAP);
     void saveHistory(this.history).catch(() => {});
   }
 

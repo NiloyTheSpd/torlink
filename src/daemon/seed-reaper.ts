@@ -57,7 +57,11 @@ export function startSeedReaper(
       queue.stopSeeding(s.id);
       if (deleteFiles) {
         void deleteSeedData(s.dir, s.name).then((target) => {
-          log(`seed time reached, stopped seeding + deleted files: ${target ?? s.name}`);
+          log(
+            target
+              ? `seed time reached, stopped seeding + deleted files: ${target}`
+              : `seed time reached, stopped seeding, but deleting ${s.name} failed (file in use?) — it is still on disk`,
+          );
         });
       } else {
         log(`seed time reached, stopped seeding (files kept): ${s.name}`);

@@ -1,4 +1,5 @@
 import { fetchResilient, HttpError, USER_AGENT } from "../util/net";
+import { toUnixSeconds } from "../util/format";
 import { parseMagnet } from "./magnet";
 import type { SearchOptions, Source, TorrentResult } from "./types";
 
@@ -60,7 +61,7 @@ async function search(query: string, opts: SearchOptions = {}): Promise<TorrentR
       leechers: 0,
       source: "subsplease",
       magnet: parsed.magnet,
-      added: entry.release_date ? new Date(entry.release_date).getTime() / 1000 : undefined,
+      added: toUnixSeconds(entry.release_date),
     });
   }
   return out;

@@ -253,7 +253,9 @@ export function App({
     (c: Config) => {
       setConfigState(c);
       queue?.setTrackers(c.trackers);
-      void saveConfig(c);
+      // A failed config save (disk full, locked file) must not crash the TUI,
+      // but it should land in crash.log instead of vanishing silently.
+      void saveConfig(c).catch((err) => logCrash("saveConfig", err));
     },
     [queue],
   );
