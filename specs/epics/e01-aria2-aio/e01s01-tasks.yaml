@@ -1,45 +1,45 @@
 story_id: e01s01
 title: aria2 engine + queue integration for direct URL downloads
-status: failing
+status: done
 bcps: 8
 tasks:
   - id: 1
     description: "URL helpers: looksLikeDirectDownload + downloadNameFromUrl"
     verify: "node node_modules/vitest/vitest.mjs run src/download/aria2.test.ts"
     risk: P2
-    status: failing
+    status: done
   - id: 2
     description: "Aria2Rpc JSON-RPC client with token auth and error mapping"
     verify: "node node_modules/vitest/vitest.mjs run src/download/aria2.test.ts"
     risk: P1
-    status: failing
+    status: done
   - id: 3
     description: "Aria2Engine lifecycle: spawn, readiness, add/stats/pause/unpause/remove/destroy"
     verify: "node node_modules/vitest/vitest.mjs run src/download/aria2.test.ts"
     risk: P0
-    status: failing
+    status: done
   - id: 4
     description: "Queue addUrl: dedupe, cap, async start, failure handling"
     verify: "node node_modules/vitest/vitest.mjs run src/download/queue.aria2.test.ts"
     risk: P0
-    status: failing
+    status: done
   - id: 5
     description: "Queue tick: async poll, stats copy, complete/error transitions"
     verify: "node node_modules/vitest/vitest.mjs run src/download/queue.aria2.test.ts"
     risk: P0
-    status: failing
+    status: done
   - id: 6
     description: "Queue controls: pause/resume/cancel/remove/retry/suspend for URL items"
     verify: "node node_modules/vitest/vitest.mjs run src/download/queue.aria2.test.ts"
     risk: P0
-    status: failing
+    status: done
   - id: 7
     description: "Persistence + restore: url fields, backward compat, resume on boot"
     verify: "node node_modules/vitest/vitest.mjs run src/download/queue.aria2.test.ts"
     risk: P0
-    status: failing
+    status: done
   - id: 8
     description: "TUI wiring: routing, store callback, Downloads tag, help"
     verify: "node node_modules/typescript/bin/tsc --noEmit"
     risk: P1
-    status: failing
+    status: done

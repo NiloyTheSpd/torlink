@@ -1,6 +1,6 @@
 epic_id: e01
 title: "aria2 direct downloads (AIO downloader)"
-status: planned
+status: done
 bcps: 8
 stories:
   - id: e01s01
