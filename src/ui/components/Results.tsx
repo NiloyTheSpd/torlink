@@ -17,7 +17,7 @@ import type { Source, TorrentResult } from "../../sources/types";
 
 type Mode = "list" | "search" | "detail" | "filter";
 
-const PLACEHOLDER = "Search or paste a magnet link…";
+const PLACEHOLDER = "Search, paste a magnet, or drop any URL…";
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return (

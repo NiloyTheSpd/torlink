@@ -58,7 +58,7 @@ export function Splash({
           width={barWidth}
           value=""
           editing
-          placeholder="Search or paste a magnet link…"
+          placeholder="Search, paste a magnet, or drop any URL…"
           onSubmit={submitQuery}
           onExitDown={() => submitQuery("")}
         />
@@ -73,6 +73,11 @@ export function Splash({
           <Text dimColor>{`  ${ICON.dot}  `}</Text>
           <Text color={COLOR.alt}>^c</Text>
           <Text dimColor> quit</Text>
+        </Text>
+      </Box>
+      <Box marginTop={1}>
+        <Text dimColor>
+          {`magnets ${ICON.dot} torrents ${ICON.dot} video pages (yt-dlp) ${ICON.dot} direct links (aria2)`}
         </Text>
       </Box>
     </Box>
