@@ -108,6 +108,15 @@ describe("YtDlpEngine", () => {
     expect(launched[0]!.args.join(" ")).toContain("C:/dl/%(title)s.%(ext)s".replaceAll("\\", "/"));
   });
 
+  it("converts audio downloads with a bestaudio/best fallback", () => {
+    const { engine, launched } = engineWith();
+    engine.add("v1", { url: SPEC.url, audioMp3: true }, "/tmp");
+    const args = launched[0]!.args;
+    const i = args.indexOf("-f");
+    expect(args[i + 1]).toBe("bestaudio/best");
+    expect(args).toContain("-x");
+  });
+
   it("returns false when no candidate can spawn", () => {
     const engine = new YtDlpEngine({
       spawnImpl: () => {

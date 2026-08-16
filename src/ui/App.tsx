@@ -35,6 +35,7 @@ import {
 } from "../download/bootguard";
 import { logCrash } from "../util/crashlog";
 import { parseInput } from "../sources/magnet";
+import { formatVideoOptions } from "./videoFormats";
 import { magnetFromTorrentFile } from "../sources/torrentFile";
 import { readClipboard, writeClipboard } from "../util/clipboard";
 import { openFolder } from "../util/openFolder";
@@ -42,7 +43,6 @@ import { cleanText, formatBytes, truncate } from "../util/format";
 import {
   extractUrl,
   getVideoInfo,
-  type YtDlpFormat,
   type YtDlpInfoResult,
 } from "../util/yt-dlp";
 import {
@@ -339,47 +339,6 @@ export function App({
     },
     [config, queue],
   );
-
-  const toHumanSize = (bytes?: number): string | null => {
-    return bytes && bytes > 0 ? formatBytes(bytes) : null;
-  };
-
-  const formatVideoOptions = (info: YtDlpInfoResult) => {
-    if (!info.ok) return [];
-    
-    const audioOption = {
-      value: "audio_mp3",
-      label: "mp3",
-      detail: "Download the best audio and convert to mp3",
-    };
-
-    const options: { value: string; label: string; detail?: string }[] = [
-      {
-        value: "bestvideo[height>=2160]+bestaudio/best[height>=2160]",
-        label: "4K",
-        detail: "2160p and above",
-      },
-      {
-        value: "bestvideo[height>=1080][height<2160]+bestaudio/best[height>=1080][height<2160]",
-        label: "1080p",
-        detail: "1080p to 2160p",
-      },
-      {
-        value: "bestvideo[height>=720][height<1080]+bestaudio/best[height>=720][height<1080]",
-        label: "720p",
-        detail: "720p to 1080p",
-      },
-      {
-        value: "bestvideo[height>=360][height<720]+bestaudio/best[height>=360][height<720]",
-        label: "360p",
-        detail: "360p to 720p",
-      },
-    ];
-
-    options.push(audioOption);
-
-    return options;
-  };
 
   const prepareVideoDownload = useCallback(
     async (url: string) => {

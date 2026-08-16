@@ -170,7 +170,7 @@ describe("downloadPlaylistUrl", () => {
       "--audio-format",
       "mp3",
       "-f",
-      "bestaudio",
+      "bestaudio/best",
       "https://example.com/playlist",
     ]);
   });

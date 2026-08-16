@@ -111,7 +111,9 @@ export class YtDlpEngine {
       : `${base}/%(title)s.%(ext)s`;
     const args = ["-o", output, "--newline", "--no-warnings"];
     if (spec.audioMp3) {
-      args.push("-x", "--audio-format", "mp3", "-f", "bestaudio");
+      // bestaudio/best: a video with no separate audio stream must still
+      // convert instead of failing the format match.
+      args.push("-x", "--audio-format", "mp3", "-f", "bestaudio/best");
     } else if (spec.formatId) {
       args.push("-f", spec.formatId);
     }

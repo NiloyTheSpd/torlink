@@ -198,7 +198,7 @@ export async function downloadVideoUrl(
   const output = resolve(dir, "%(title)s.%(ext)s").replaceAll("\\", "/");
   const args = ["-o", output, "--no-warnings", "--no-progress"];
   if (audioMp3) {
-    args.push("-x", "--audio-format", "mp3", "-f", "bestaudio");
+    args.push("-x", "--audio-format", "mp3", "-f", "bestaudio/best");
   } else if (formatId) {
     args.push("-f", formatId);
   }
@@ -216,7 +216,7 @@ export async function downloadPlaylistUrl(
   const output = resolve(dir, "%(playlist_title)s", "%(title)s.%(ext)s").replaceAll("\\", "/");
   const args = ["-o", output, "--no-warnings", "--no-progress"];
   if (audioMp3) {
-    args.push("-x", "--audio-format", "mp3", "-f", "bestaudio");
+    args.push("-x", "--audio-format", "mp3", "-f", "bestaudio/best");
   } else if (formatId) {
     args.push("-f", formatId);
   }
