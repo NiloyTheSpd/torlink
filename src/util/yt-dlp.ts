@@ -15,6 +15,7 @@ export interface YtDlpFormat {
   ext: string;
   width?: number;
   height?: number;
+  fps?: number;
   tbr?: number;
   abr?: number;
   filesize?: number;

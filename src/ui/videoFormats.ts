@@ -1,4 +1,5 @@
-import type { YtDlpInfoResult } from "../util/yt-dlp";
+import { formatBytes } from "../util/format";
+import type { YtDlpFormat, YtDlpInfoResult } from "../util/yt-dlp";
 
 export interface VideoQualityOption {
   value: string;
@@ -6,51 +7,65 @@ export interface VideoQualityOption {
   detail?: string;
 }
 
-// Each tier ends in a full degradation chain (…/bestvideo+bestaudio/best):
-// picking a tier the video doesn't actually have must fall back to the best
-// available format instead of dying with yt-dlp's "Requested format is not
-// available" — which is exactly what a 4K pick on a 1080p-only video did
-// before the tail existed.
+// Every video option ends in a full degradation chain so a stream that
+// vanished between the info fetch and the download falls back to the best
+// available format instead of failing with "Requested format is not
+// available".
 const FALLBACK = "/bestvideo+bestaudio/best";
 
-const TIERS: { label: string; detail: string; min: number; expr: string }[] = [
-  {
-    label: "4K",
-    detail: "2160p and above",
-    min: 2160,
-    expr: "bestvideo[height>=2160]+bestaudio/best[height>=2160]",
-  },
-  {
-    label: "1080p",
-    detail: "1080p to 2160p",
-    min: 1080,
-    expr: "bestvideo[height>=1080][height<2160]+bestaudio/best[height>=1080][height<2160]",
-  },
-  {
-    label: "720p",
-    detail: "720p to 1080p",
-    min: 720,
-    expr: "bestvideo[height>=720][height<1080]+bestaudio/best[height>=720][height<1080]",
-  },
-  {
-    label: "360p",
-    detail: "360p to 720p",
-    min: 360,
-    expr: "bestvideo[height>=360][height<720]+bestaudio/best[height>=360][height<720]",
-  },
-];
+const isVideoFormat = (f: YtDlpFormat): boolean =>
+  !!f.vcodec && f.vcodec !== "none" && (f.height ?? 0) > 0;
 
-/** The quality menu for the format prompt, built from what the video has. */
+const isAudioFormat = (f: YtDlpFormat): boolean => !!f.acodec && f.acodec !== "none";
+
+const bitrate = (f: YtDlpFormat): number => f.tbr ?? f.abr ?? 0;
+
+const sizeOf = (f?: YtDlpFormat): number => (f ? f.filesize ?? f.filesize_approx ?? 0 : 0);
+
+/** The quality menu for the format prompt: one row per resolution the video
+ *  actually offers (best first), then the audio (mp3) mode. Built from the
+ *  real yt-dlp format list — nothing is offered that isn't there. */
 export function formatVideoOptions(info: YtDlpInfoResult): VideoQualityOption[] {
   if (!info.ok) return [];
-  const heights = info.formats.map((f) => f.height ?? 0).filter((h) => h > 0);
-  const maxHeight = heights.length ? Math.max(...heights) : 0;
-  const options = TIERS.filter(
-    // Hide tiers above the best stream the video actually offers (no 4K row
-    // for a 1080p upload). With no height info at all, keep every tier: the
-    // fallback chain covers whatever yt-dlp finds at download time.
-    (t) => maxHeight === 0 || maxHeight >= t.min,
-  ).map((t) => ({ value: `${t.expr}${FALLBACK}`, label: t.label, detail: t.detail }));
+
+  const videoFormats = info.formats.filter(isVideoFormat);
+  const bestAudio = info.formats.filter(isAudioFormat).sort((a, b) => bitrate(b) - bitrate(a))[0];
+
+  const heights = [...new Set(videoFormats.map((f) => f.height!))].sort((a, b) => b - a);
+  const options: VideoQualityOption[] = heights.map((h) => {
+    // The streams at this height, best bitrate first: the first is the one
+    // the download will actually take, so its fps/size drive the detail row.
+    const atHeight = videoFormats
+      .filter((f) => f.height === h)
+      .sort((a, b) => bitrate(b) - bitrate(a));
+    const best = atHeight[0]!;
+    const fps = Math.round(best.fps ?? 0);
+    // A merged download is video + best audio, so estimate both halves.
+    const bytes = sizeOf(best) + sizeOf(bestAudio);
+    const detail = [
+      best.ext,
+      fps > 0 ? `${fps}fps` : "",
+      bytes > 0 ? `~${formatBytes(bytes)}` : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    return {
+      value: `bestvideo[height<=${h}]+bestaudio/best[height<=${h}]${FALLBACK}`,
+      label: `${h}p`,
+      detail,
+    };
+  });
+
+  if (options.length === 0) {
+    // No usable height info (playlists, some protected streams): offer a
+    // single guarded best option rather than an empty menu.
+    options.push({
+      value: `bestvideo+bestaudio/best`,
+      label: "best",
+      detail: "best available quality",
+    });
+  }
+
   options.push({
     value: "audio_mp3",
     label: "mp3",
