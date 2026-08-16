@@ -21,6 +21,18 @@ const MARK = 2;
 
 const PAUSED = "#7c7785";
 
+// The right-edge engine tag: where a torrent came from, or which engine owns
+// a non-torrent row (url = aria2 direct link, vid/mp3 = yt-dlp media).
+function engineTag(it: { source?: QueueItem["source"]; url?: string; video?: QueueItem["video"] }): {
+  tag: string;
+  color: string | null;
+} {
+  if (it.video) return { tag: it.video.audioMp3 ? "mp3" : "vid", color: COLOR.good };
+  if (it.url) return { tag: "url", color: COLOR.alt };
+  if (it.source) return { tag: sourceStyle(it.source).tag, color: sourceStyle(it.source).color };
+  return { tag: "mag", color: null };
+}
+
 function statusColor(status: QueueItem["status"]): string {
   if (status === "failed") return COLOR.bad;
   if (status === "paused" || status === "queued") return PAUSED;
@@ -38,7 +50,10 @@ function rightStats(it: QueueItem): string {
   if (it.status === "downloading") {
     const speed = formatBytesPerSec(it.speed) || "…";
     const eta = it.eta ? `  ${formatEtaShort(it.eta)}` : "";
-    return `${it.progress}%  ${speed}  ${ICON.peer}${it.peers}${eta}`;
+    // Peers/connections only exist for swarms (torrents) and direct links;
+    // a media row has no peer count to show.
+    const peers = it.video ? "" : `  ${ICON.peer}${it.peers}`;
+    return `${it.progress}%  ${speed}${peers}${eta}`;
   }
   if (it.status === "paused") return `paused  ${it.progress}%`;
   if (it.status === "queued") return `queued  ${it.progress}%`;
@@ -53,10 +68,10 @@ export function Downloads() {
     listRows,
     startDownload,
     startUrlDownload,
+    startVideoDownload,
     openDownloadFolder,
     setDownloadFocus,
     exportTorrent,
-    mediaDownloads,
   } = useStore();
   const active = useQueueItems(queue);
   const recent = useQueueHistory(queue);
@@ -88,7 +103,8 @@ export function Downloads() {
         const h = recent[recentCursor];
         if (!h) return;
         if (key.return || input === "d") {
-          if (h.url) startUrlDownload(h.url);
+          if (h.video && h.url) startVideoDownload(h.url, h.video);
+          else if (h.url) startUrlDownload(h.url);
           else
             startDownload({
               id: h.id,
@@ -119,9 +135,9 @@ export function Downloads() {
     return () => setDownloadFocus(null);
   }, [focusKind, setDownloadFocus]);
 
-  const panelH = Math.max(5, listRows - 1 + (mediaDownloads.length > 0 ? mediaDownloads.length + 1 : 0));
+  const panelH = Math.max(5, listRows - 1);
 
-  if (total === 0 && mediaDownloads.length === 0) {
+  if (total === 0) {
     return (
       <Panel title="downloads" width={contentWidth} focused={focused} height={panelH}>
         <Text dimColor>No downloads yet. Find something and press d to grab it.</Text>
@@ -131,7 +147,6 @@ export function Downloads() {
 
   const hasActive = active.length > 0;
   const hasRecent = recent.length > 0;
-  const hasMedia = mediaDownloads.length > 0;
   const headerRows = hasRecent ? 1 : 0;
   const ceiling = Math.max(1, panelH - 1);
 
@@ -167,67 +182,10 @@ export function Downloads() {
 
   return (
     <Panel title="downloads" width={contentWidth} focused={focused} count={count} height={panelH}>
-      {hasMedia ? (
-        <Box marginBottom={1} flexDirection="column">
-          <Text color={COLOR.accent}>media</Text>
-          {mediaDownloads.map((item) => {
-            const color =
-              item.state === "error" ? COLOR.bad : item.state === "done" ? COLOR.good : COLOR.accent;
-            const icon = item.state === "running" ? ICON.down : item.state === "done" ? ICON.done : ICON.error;
-            const progress = item.state === "running" ? 45 : item.state === "done" ? 100 : 0;
-            return (
-              <Box key={item.id} marginTop={1} flexDirection="column">
-                <Box>
-                  <Box
-                    width={10}
-                    flexShrink={0}
-                    flexDirection="column"
-                    alignItems="center"
-                    justifyContent="center"
-                    borderStyle="round"
-                    borderColor={COLOR.alt}
-                    paddingX={1}
-                    paddingY={0}
-                    marginRight={1}
-                  >
-                    <Text color={color} bold>
-                      🖼️
-                    </Text>
-                    <Text dimColor>{item.thumbnail ? "thumb" : "no thumb"}</Text>
-                  </Box>
-                  <Box flexGrow={1} minWidth={0} flexDirection="column">
-                    <Text color={color} bold wrap="truncate-end">
-                      {cleanText(item.name)}
-                    </Text>
-                    <Text dimColor>
-                      {item.state === "running"
-                        ? "video • downloading"
-                        : item.state === "done"
-                        ? "download complete"
-                        : item.state}
-                    </Text>
-                    {item.thumbnail ? (
-                      <Text dimColor>{truncate(item.thumbnail, 56)}</Text>
-                    ) : null}
-                  </Box>
-                  <Box width={10} flexShrink={0} marginLeft={1} justifyContent="flex-end">
-                    <Text color={color}>{icon}</Text>
-                  </Box>
-                </Box>
-                <Box marginTop={1}>
-                  <Box width={10} flexShrink={0} />
-                  <ProgressBar pct={progress} width={Math.max(12, Math.min(26, contentWidth - 12))} color={color} animate={item.state === "running"} />
-                </Box>
-              </Box>
-            );
-          })}
-        </Box>
-      ) : null}
-
       {activeVisible.map((it, i) => {
         const here = activeStart + i === clamped && focused && inActive;
         const sc = statusColor(it.status);
-        const ss = sourceStyle(it.source);
+        const et = engineTag(it);
         return (
           <Box key={it.id} flexDirection="column">
             <Box>
@@ -258,10 +216,10 @@ export function Downloads() {
               </Box>
               <Box width={4} flexShrink={0} marginLeft={1} justifyContent="flex-end">
                 <Text
-                  color={it.source ? ss.color : it.url ? COLOR.alt : undefined}
-                  dimColor={(!it.source && !it.url) || !here}
+                  color={et.color ?? undefined}
+                  dimColor={!here}
                   bold={here}
-                >{it.source ? ss.tag : it.url ? "url" : "mag"}
+                >{et.tag}
                 </Text>
               </Box>
             </Box>
@@ -289,7 +247,7 @@ export function Downloads() {
 
       {recentVisible.map((h: HistoryItem, i) => {
         const here = recentStart + i === recentCursor && focused && !inActive;
-        const ss = sourceStyle(h.source);
+        const et = engineTag(h);
         const when = formatRelative(h.completedAt / 1000);
         return (
           <Box key={h.id}>
@@ -329,10 +287,10 @@ export function Downloads() {
             </Box>
             <Box width={4} flexShrink={0} marginLeft={1} justifyContent="flex-end">
               <Text
-                color={h.source ? ss.color : h.url ? COLOR.alt : undefined}
-                dimColor={(!h.source && !h.url) || !here}
+                color={et.color ?? undefined}
+                dimColor={!here}
                 bold={here}
-              >{h.source ? ss.tag : h.url ? "url" : "mag"}
+              >{et.tag}
               </Text>
             </Box>
           </Box>

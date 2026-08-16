@@ -14,7 +14,7 @@ import type { DownloadQueue } from "../download/queue";
 import type { QueueItem, SeedItem } from "../download/types";
 import type { HistoryItem } from "../download/history";
 import { RAIL_WIDTH } from "./components/Sidebar";
-import type { MediaDownloadStatus, Store } from "./store";
+import type { Store } from "./store";
 
 export const TEST_COLS = 80;
 export const TEST_CONTENT_WIDTH = Math.max(24, TEST_COLS - RAIL_WIDTH - 3);
@@ -161,6 +161,7 @@ export function makeTestStore(overrides: Partial<Store> = {}): Store {
     setResultFocus: noop,
     startDownload: noop,
     startUrlDownload: noop,
+    startVideoDownload: noop,
     requestDownloadTo: noop,
     copyMagnet: noop,
     openDownloadFolder: noop,
@@ -168,8 +169,6 @@ export function makeTestStore(overrides: Partial<Store> = {}): Store {
     fetchAndExportTorrent: noop,
     notice: null,
     setNotice: noop,
-    mediaDownloads: [] as MediaDownloadStatus[],
-    downloadMode: null,
     quitAll: noop,
     listRows: 14,
     compact: false,

@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { TorrentEngine, message, type AddHandlers } from "./engine";
 import { Aria2Engine, downloadNameFromUrl, type Aria2Status } from "./aria2";
+import { YtDlpEngine, type YtDlpProgress } from "./ytdlp";
 import {
   saveQueue,
   saveQueueSync,
@@ -16,7 +17,7 @@ import {
 import { saveHistory, saveHistorySync, HISTORY_CAP, type HistoryItem } from "./history";
 import { deleteSeedData } from "./delete-data";
 import { disarmBootMarker } from "./bootguard";
-import type { QueueItem, SeedItem } from "./types";
+import type { QueueItem, SeedItem, VideoDownloadSpec } from "./types";
 import type { SourceId } from "../sources/types";
 
 /**
@@ -83,6 +84,15 @@ export interface Aria2EngineLike {
   destroy(): Promise<void>;
 }
 
+// The slice of YtDlpEngine the queue drives, structural for the same reason.
+export interface YtDlpEngineLike {
+  add(id: string, spec: VideoDownloadSpec, dir: string): boolean;
+  stats(id: string): YtDlpProgress | null;
+  pause(id: string): void;
+  remove(id: string): void;
+  destroy(): void;
+}
+
 export interface RestoreOptions {
   // Safe mode: the previous boot died while restoring (see bootguard.ts), so
   // bring every item back paused and start no engines. The list stays intact
@@ -94,6 +104,7 @@ export class DownloadQueue extends EventEmitter {
   private items = new Map<string, QueueItem>();
   private engine = new TorrentEngine();
   private aria2: Aria2EngineLike = new Aria2Engine();
+  private ytdlp: YtDlpEngineLike = new YtDlpEngine();
   // Queue item id -> aria2 gid for direct (url) downloads.
   private gids = new Map<string, string>();
   private poll: ReturnType<typeof setInterval> | null = null;
@@ -107,10 +118,11 @@ export class DownloadQueue extends EventEmitter {
   // Max torrents allowed to download at once; overflow waits as "queued".
   private readonly maxDownloads: number;
 
-  constructor(opts?: { maxDownloads?: number; aria2?: Aria2EngineLike }) {
+  constructor(opts?: { maxDownloads?: number; aria2?: Aria2EngineLike; ytdlp?: YtDlpEngineLike }) {
     super();
     this.maxDownloads = opts?.maxDownloads ?? readMaxDownloads();
     if (opts?.aria2) this.aria2 = opts.aria2;
+    if (opts?.ytdlp) this.ytdlp = opts.ytdlp;
   }
 
   // Extra announce URLs appended to every torrent added from now on.
@@ -201,10 +213,27 @@ export class DownloadQueue extends EventEmitter {
   }
 
   // Route an item to its engine: torrents are synchronous, direct (url)
-  // downloads start asynchronously through the aria2 RPC.
+  // downloads start asynchronously through the aria2 RPC, and media (video)
+  // downloads spawn a yt-dlp process.
   private startItem(item: QueueItem): void {
     if (item.url) void this.startUrlEngine(item);
+    else if (item.video) this.startVideoEngine(item);
     else this.startEngine(item);
+  }
+
+  private startVideoEngine(item: QueueItem): void {
+    if (!item.video) return;
+    if (this.ytdlp.add(item.id, item.video, item.dir)) return;
+    // No yt-dlp anywhere (bundled, PATH, python): fail the item with a
+    // readable message instead of leaving a download that can never move.
+    item.status = "failed";
+    item.error = "yt-dlp is not installed or unavailable.";
+    item.speed = 0;
+    item.peers = 0;
+    this.changed();
+    void this.persist();
+    this.promote(); // a slot just freed
+    this.maybeStopPoll();
   }
 
   private async startUrlEngine(item: QueueItem): Promise<void> {
@@ -269,6 +298,74 @@ export class DownloadQueue extends EventEmitter {
         };
     // Same concurrent-download cap as torrents: start now if a slot is free,
     // else hold as "queued" until one frees (see promote()).
+    const start = this.maxDownloads === 0 || this.activeCount < this.maxDownloads;
+    item.status = start ? "downloading" : "queued";
+    this.items.set(item.id, item);
+    if (start) {
+      this.startItem(item);
+      this.ensurePoll();
+    }
+    this.changed();
+    void this.persist();
+    return { added: true, name };
+  }
+
+  /**
+   * Queue a yt-dlp media download (video, audio, or whole playlist). The id
+   * is derived from the URL (`video:<url>`) so a restart restores the same
+   * item and yt-dlp resumes its .part file. Returns whether the item was
+   * newly added (false = already in the queue) and the display name.
+   */
+  addVideo(input: {
+    url: string;
+    name?: string;
+    dir: string;
+    formatId?: string;
+    audioMp3?: boolean;
+    isPlaylist?: boolean;
+  }): { added: boolean; name: string } {
+    const id = `video:${input.url}`;
+    const existing = this.items.get(id);
+    if (existing && existing.status !== "failed") {
+      return { added: false, name: existing.name };
+    }
+    const spec: VideoDownloadSpec = {
+      url: input.url,
+      formatId: input.formatId,
+      audioMp3: input.audioMp3,
+      isPlaylist: input.isPlaylist,
+    };
+    const name = input.name ?? urlItemName(input.url);
+    const item: QueueItem = existing
+      ? {
+          ...existing,
+          // A re-add may carry a different quality choice, so the spec and
+          // display name follow this request, not the failed attempt.
+          video: spec,
+          name,
+          dir: input.dir,
+          status: "downloading",
+          error: undefined,
+          speed: 0,
+          ...(existing.dir === input.dir
+            ? {}
+            : { progress: 0, downloadedBytes: 0, eta: undefined }),
+        }
+      : {
+          id,
+          name,
+          video: spec,
+          magnet: "",
+          dir: input.dir,
+          status: "downloading",
+          progress: 0,
+          totalBytes: 0,
+          downloadedBytes: 0,
+          speed: 0,
+          peers: 0,
+          addedAt: Date.now(),
+        };
+    // Same concurrent-download cap as torrents and direct urls.
     const start = this.maxDownloads === 0 || this.activeCount < this.maxDownloads;
     item.status = start ? "downloading" : "queued";
     this.items.set(item.id, item);
@@ -377,6 +474,9 @@ export class DownloadQueue extends EventEmitter {
       const gid = this.gids.get(it.id);
       this.gids.delete(it.id);
       if (gid) void this.aria2.remove(gid).catch(() => {});
+    } else if (it.video) {
+      // Drop the exited yt-dlp process handle.
+      this.ytdlp.remove(it.id);
     }
     // Opt-out seeding: a finished download is already a complete, verified
     // torrent, so keep it alive and seeding instead of tearing it down.
@@ -418,6 +518,38 @@ export class DownloadQueue extends EventEmitter {
       let any = false;
       for (const it of this.items.values()) {
         if (it.status !== "downloading") continue;
+        if (it.video) {
+          const st = this.ytdlp.stats(it.id);
+          if (!st) continue;
+          if (st.status === "complete") {
+            if (st.totalBytes) {
+              it.totalBytes = st.totalBytes;
+              it.downloadedBytes = st.totalBytes;
+            }
+            this.complete(it);
+            continue;
+          }
+          if (st.status === "error") {
+            it.status = "failed";
+            it.error = st.error ?? "yt-dlp failed";
+            it.speed = 0;
+            it.peers = 0;
+            it.eta = undefined;
+            this.changed();
+            void this.persist();
+            this.promote(); // a slot just freed
+            this.maybeStopPoll();
+            continue;
+          }
+          it.progress = st.progress;
+          it.downloadedBytes = st.downloadedBytes;
+          if (st.totalBytes) it.totalBytes = st.totalBytes;
+          it.speed = st.speed;
+          it.peers = 0;
+          it.eta = st.eta;
+          any = true;
+          continue;
+        }
         if (it.url) {
           const gid = this.gids.get(it.id);
           if (!gid) continue;
@@ -538,6 +670,10 @@ export class DownloadQueue extends EventEmitter {
         // resume() unpauses the same gid.
         const gid = this.gids.get(id);
         if (gid) void this.aria2.pause(gid).catch(() => {});
+      } else if (it.video) {
+        // Kill the yt-dlp process; resume() spawns it again and --continue
+        // picks the .part file back up.
+        this.ytdlp.pause(id);
       } else {
         this.engine.remove(id);
       }
@@ -647,6 +783,8 @@ export class DownloadQueue extends EventEmitter {
       const gid = this.gids.get(id);
       this.gids.delete(id);
       if (gid) void this.aria2.remove(gid).catch(() => {});
+    } else if (it?.video) {
+      this.ytdlp.remove(id);
     } else {
       this.engine.remove(id);
     }
@@ -677,6 +815,8 @@ export class DownloadQueue extends EventEmitter {
       const gid = this.gids.get(id);
       this.gids.delete(id);
       if (gid) void this.aria2.remove(gid).catch(() => {});
+    } else if (it?.video) {
+      this.ytdlp.remove(id);
     } else if (it || seed) {
       this.engine.remove(id);
     }
@@ -904,7 +1044,11 @@ export class DownloadQueue extends EventEmitter {
       source: it.source,
       sizeBytes: it.totalBytes,
       magnet: it.magnet,
-      url: it.url,
+      // For video items the queue-level url stays unset (it means aria2
+      // everywhere else); history still records the page url so Recent can
+      // re-run the download on enter.
+      url: it.url ?? it.video?.url,
+      video: it.video ? { ...it.video } : undefined,
       dir: it.dir,
       completedAt: Date.now(),
     };
@@ -982,6 +1126,7 @@ export class DownloadQueue extends EventEmitter {
       this.poll = null;
     }
     this.engine.destroy();
+    this.ytdlp.destroy();
     void this.aria2.destroy();
   }
 }

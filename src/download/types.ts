@@ -28,6 +28,10 @@ export interface QueueItem {
   // A direct http(s)/ftp URL (aria2 download). Present exactly when this item
   // is a direct download; torrent items leave it unset and keep magnet set.
   url?: string;
+  // A yt-dlp video/audio download (single video or playlist). Present exactly
+  // when this item is a media download; magnet stays empty. Kept separate
+  // from `url` so queue routing never confuses the two engines.
+  video?: VideoDownloadSpec;
   dir: string;
   status: DownloadStatus;
   progress: number;
@@ -39,4 +43,13 @@ export interface QueueItem {
   files?: number;
   error?: string;
   addedAt: number;
+}
+
+// Everything needed to (re)start a yt-dlp download: the page URL plus the
+// chosen quality. yt-dlp resumes .part files on restart via --continue.
+export interface VideoDownloadSpec {
+  url: string;
+  formatId?: string;
+  audioMp3?: boolean;
+  isPlaylist?: boolean;
 }

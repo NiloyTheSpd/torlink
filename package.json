@@ -24,6 +24,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "verify:seeding": "tsx scripts/verify-seeding.ts",
+    "verify:video": "tsx scripts/smoke-video.ts",
     "previews": "tsx scripts/render-previews.tsx",
     "postinstall": "node scripts/ensure-webrtc.cjs && node scripts/ensure-ytdlp.cjs && node scripts/ensure-aria2.cjs",
     "prepublishOnly": "npm run build"

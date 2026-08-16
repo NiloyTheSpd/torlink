@@ -47,6 +47,7 @@ export const HELP_GROUPS: HelpGroup[] = [
       { keys: "d", label: "Download again" },
       { keys: "e", label: "Open folder" },
       { keys: "s", label: "Export torrent file" },
+      { keys: "tag", label: "url/vid/mp3 = link/video/audio" },
     ],
   },
   {

@@ -180,32 +180,70 @@ describe("Downloads queued rows", () => {
     expect(lineWith(u, "kubuntu 25.10")).toContain("·");
   });
 
-  it("renders yt-dlp downloads alongside torrent items", async () => {
-    const u = renderUI(
+  it("renders yt-dlp video items like any other engine row, with a vid tag and no peer count", async () => {
+    const videoItem: QueueItem = {
+      ...activeItem("v1", "big buck bunny 1080p"),
+      source: undefined,
+      magnet: "",
+      video: { url: "https://example.com/watch?v=bunny" },
+      progress: 62,
+      speed: 2.5e6,
+      peers: 0,
+      eta: 91,
+    };
+    const u = mount([videoItem], []);
+    await vi.waitFor(() => expect(u.frame()).toContain("big buck bunny"));
+    const line = lineWith(u, "big buck bunny");
+    expect(line).toContain("vid");
+    expect(line).not.toContain("mag");
+    // Stats row: real progress and speed, no swarm/peer segment (ICON.peer).
+    const stats = lineWith(u, "62%");
+    expect(stats).toContain("62%");
+    expect(stats).toContain("2.4 MB/s");
+    expect(stats).not.toContain("•");
+  });
+
+  it("tags audio (mp3) downloads distinctly from video", async () => {
+    const mp3Item: QueueItem = {
+      ...activeItem("v2", "lofi beats to queue to"),
+      source: undefined,
+      magnet: "",
+      video: { url: "https://example.com/watch?v=lofi", audioMp3: true },
+    };
+    const u = mount([mp3Item], []);
+    await vi.waitFor(() => expect(u.frame()).toContain("lofi beats"));
+    expect(lineWith(u, "lofi beats")).toContain("mp3");
+  });
+
+  it("re-downloads a video history item with its saved format on enter", async () => {
+    const startVideoDownload = vi.fn();
+    const videoHistory: HistoryItem = {
+      ...recentItem("h5", "cool video"),
+      url: "https://example.com/watch?v=cool",
+      magnet: "",
+      video: { url: "https://example.com/watch?v=cool", formatId: "22" },
+    };
+    ui = renderUI(
       <StoreContext.Provider
         value={makeTestStore({
-          queue: fakeQueue(ACTIVE, RECENT),
+          queue: fakeQueue([], [videoHistory]),
           section: "downloads",
-          mediaDownloads: [
-            {
-              id: "m1",
-              name: "demo clip",
-              url: "https://example.com/video",
-              dir: "~/Downloads/torlink",
-              state: "running",
-              message: "Downloading video…",
-              thumbnail: "https://example.com/thumb.jpg",
-            },
-          ],
+          startVideoDownload,
         })}
       >
         <Downloads />
       </StoreContext.Provider>,
     );
-
-    await vi.waitFor(() => expect(u.frame()).toContain("demo clip"));
-    expect(u.frame()).toContain("video • downloading");
-    expect(u.frame()).toContain("demo clip");
-    expect(u.frame()).toContain("video");
+    const u = ui;
+    await vi.waitFor(() => expect(u.frame()).toContain("cool video"));
+    await tick();
+    u.press(KEY.enter);
+    await vi.waitFor(() =>
+      expect(startVideoDownload).toHaveBeenCalledWith("https://example.com/watch?v=cool", {
+        url: "https://example.com/watch?v=cool",
+        formatId: "22",
+      }),
+    );
+    expect(startVideoDownload).toHaveBeenCalledTimes(1);
   });
 });

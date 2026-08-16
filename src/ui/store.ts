@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import type { Config } from "../config/config";
 import type { DownloadQueue } from "../download/queue";
 import type { HistoryItem } from "../download/history";
-import type { QueueItem, SeedItem } from "../download/types";
+import type { QueueItem, SeedItem, VideoDownloadSpec } from "../download/types";
 import type { SourceGroup, SourceId } from "../sources/types";
 
 export type View = "splash" | "browser";
@@ -29,16 +29,6 @@ export type DownloadFocus = "downloading" | "paused" | "failed" | "recent";
 export type SeedFocus = "seeding" | "paused" | "missing" | "idle";
 
 export type ResultFocus = "list" | "detail";
-
-export interface MediaDownloadStatus {
-  id: string;
-  name: string;
-  url: string;
-  dir: string;
-  state: "running" | "done" | "error";
-  message: string;
-  thumbnail?: string;
-}
 
 export interface Store {
   config: Config;
@@ -74,6 +64,9 @@ export interface Store {
   // Queues a direct http(s)/ftp link through the aria2 engine (dedupes by
   // url-derived id) and reports the outcome through the notice line.
   startUrlDownload: (url: string) => void;
+  // Queues a yt-dlp media download (video page URL + the chosen quality) into
+  // the same Downloads view as torrents and direct links.
+  startVideoDownload: (url: string, spec: Omit<VideoDownloadSpec, "url"> & { name?: string }) => void;
   // Opens the "download to" prompt (D) so this one download can land in a
   // folder other than the configured default.
   requestDownloadTo: (input: {
@@ -94,8 +87,6 @@ export interface Store {
 
   notice: string | null;
   setNotice: (s: string | null) => void;
-  mediaDownloads: MediaDownloadStatus[];
-  downloadMode: "torrent" | "media" | null;
 
   quitAll: () => void;
 

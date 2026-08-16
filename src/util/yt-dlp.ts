@@ -61,8 +61,8 @@ const BUNDLED_YTDLP = resolve(
 // Resolution order: the bundled binary, then a system yt-dlp, then the
 // python module under either interpreter name. The python candidates fix the
 // original fallback, which spawned process.execPath (node) with -m yt_dlp
-// and could never work.
-function* ytDlpCandidates(): Generator<readonly [string, readonly string[]]> {
+// and could never work. Shared with the download engine (src/download/ytdlp.ts).
+export function* ytDlpCandidates(): Generator<readonly [string, readonly string[]]> {
   if (existsSync(BUNDLED_YTDLP)) yield [BUNDLED_YTDLP, []];
   yield ["yt-dlp", []];
   yield ["python", ["-m", "yt_dlp"]];

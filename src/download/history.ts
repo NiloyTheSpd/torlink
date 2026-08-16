@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import { historyFile } from "../config/paths";
 import { serializeWrites, writeJsonAtomic, writeJsonAtomicSync } from "../util/atomic";
 import type { SourceId } from "../sources/types";
+import type { VideoDownloadSpec } from "./types";
 
 export const HISTORY_CAP = 500;
 
@@ -13,6 +14,9 @@ export interface HistoryItem {
   magnet: string;
   // Set for direct (aria2) downloads; empty magnet goes with it.
   url?: string;
+  // Set for yt-dlp downloads (goes with url + empty magnet) so Recent can
+  // re-run the same quality without re-prompting for a format.
+  video?: VideoDownloadSpec;
   dir: string;
   completedAt: number;
 }
