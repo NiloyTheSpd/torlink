@@ -25,6 +25,9 @@ export interface QueueItem {
   name: string;
   source?: SourceId;
   magnet: string;
+  // A direct http(s)/ftp URL (aria2 download). Present exactly when this item
+  // is a direct download; torrent items leave it unset and keep magnet set.
+  url?: string;
   dir: string;
   status: DownloadStatus;
   progress: number;

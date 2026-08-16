@@ -4,6 +4,26 @@ import { promises as fs } from "node:fs";
 import { loadConfig, saveConfig, type Config } from "../config/config";
 import { normalizeDownloadDir } from "../config/folder";
 import { DownloadQueue } from "../download/queue";
+import { looksLikeDirectDownload } from "../download/aria2";
+
+export type UrlRoute =
+  | { kind: "direct"; url: string }
+  | { kind: "video"; url: string };
+
+/** Decide how a pasted/typed URL is downloaded: direct http(s) via aria2,
+ *  or yt-dlp. "dl <url>" always forces direct; otherwise a URL whose last
+ *  path segment names a file goes direct, everything else (streams,
+ *  playlists, pages) goes through yt-dlp. Returns null when no URL is
+ *  present. */
+export function routeUrlInput(raw: string): UrlRoute | null {
+  const q = raw.trim();
+  const url = extractUrl(q);
+  if (!url) return null;
+  const forced = q.startsWith("dl ") && q.length > 3;
+  return forced || looksLikeDirectDownload(url)
+    ? { kind: "direct", url }
+    : { kind: "video", url };
+}
 import { loadQueue, loadSeeds } from "../download/persist";
 import { loadHistory } from "../download/history";
 import { reconcileQueue } from "../download/reconcile";
@@ -303,6 +323,26 @@ export function App({
     [config, queue],
   );
 
+  // Queue a direct http(s)/ftp link through aria2. The id is url-derived, so
+  // re-downloading (or pasting) the same link dedupes against the active item.
+  const startUrlDownload = useCallback(
+    (url: string) => {
+      if (!config || !queue) return;
+      void fs.mkdir(config.downloadDir, { recursive: true }).catch(() => {});
+      void (async () => {
+        const out = await queue.addUrl(url, config.downloadDir);
+        setNotice(
+          out.added
+            ? `Downloading: ${truncate(cleanText(out.name), 40)}`
+            : `Already downloading: ${truncate(cleanText(out.name), 40)}`,
+        );
+        setSection("downloads");
+        setRegion("content");
+      })();
+    },
+    [config, queue],
+  );
+
   const toHumanSize = (bytes?: number): string | null => {
     return bytes && bytes > 0 ? formatBytes(bytes) : null;
   };
@@ -556,9 +596,10 @@ export function App({
           setRegion("content");
           return;
         }
-        const url = extractUrl(q);
-        if (url) {
-          void prepareVideoDownload(url);
+        const routed = routeUrlInput(q);
+        if (routed) {
+          if (routed.kind === "direct") startUrlDownload(routed.url);
+          else void prepareVideoDownload(routed.url);
           setView("browser");
           setSection("downloads");
           setRegion("content");
@@ -571,7 +612,7 @@ export function App({
       if (section === "downloads") setSection("all");
       setRegion("content");
     },
-    [section, startDownload, prepareVideoDownload],
+    [section, startDownload, prepareVideoDownload, startUrlDownload],
   );
 
   const pasteFromClipboard = useCallback(async () => {
@@ -591,16 +632,17 @@ export function App({
       setRegion("content");
       return;
     }
-    const url = extractUrl(content);
-    if (url) {
-      void prepareVideoDownload(url);
+    const routed = routeUrlInput(content);
+    if (routed) {
+      if (routed.kind === "direct") startUrlDownload(routed.url);
+      else void prepareVideoDownload(routed.url);
       setView("browser");
       setSection("downloads");
       setRegion("content");
       return;
     }
     setNotice("No magnet link on the clipboard.");
-  }, [startDownload, prepareVideoDownload]);
+  }, [startDownload, prepareVideoDownload, startUrlDownload]);
 
   useEffect(() => {
     if (!notice) return;
@@ -650,6 +692,7 @@ export function App({
       resultFocus,
       setResultFocus,
       startDownload,
+      startUrlDownload,
       requestDownloadTo,
       copyMagnet,
       openDownloadFolder,
@@ -683,6 +726,7 @@ export function App({
     seedFocus,
     resultFocus,
     startDownload,
+    startUrlDownload,
     requestDownloadTo,
     copyMagnet,
     openDownloadFolder,
